@@ -30,12 +30,12 @@
 
 from legged_gym import LEGGED_GYM_ROOT_DIR, LEGGED_GYM_ENVS_DIR
 from legged_gym.envs.a1.a1_config import A1RoughCfg, A1RoughCfgPPO
-# from legged_gym.envs.gen3.gen3_config import gen3RoughCfg, gen3RoughCfgPPO
+from legged_gym.envs.gen3.gen3_config import gen3RoughCfg, gen3RoughCfgPPO
 from .base.legged_robot import LeggedRobot
 from .a1.a1_config import A1RoughCfg, A1RoughCfgPPO
 from .a1.a1_amp_config import A1AMPCfg, A1AMPCfgPPO
 from .gen3.gen3_config import gen3RoughCfg, gen3RoughCfgPPO
-from .gen3.gen3_amp_config import 
+from .gen3.gen3_amp_config import gen3AMPCfg, gen3AMPCfgPPO
 
 import os
 

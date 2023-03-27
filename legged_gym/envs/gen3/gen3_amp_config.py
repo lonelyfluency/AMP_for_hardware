@@ -136,7 +136,7 @@ class gen3AMPCfg( LeggedRobotCfg ):
             ang_vel_yaw = [-1.57, 1.57]    # min max [rad/s]
             heading = [-3.14, 3.14]
 
-class A1AMPCfgPPO( LeggedRobotCfgPPO ):
+class gen3AMPCfgPPO( LeggedRobotCfgPPO ):
     runner_class_name = 'AMPOnPolicyRunner'
     class algorithm( LeggedRobotCfgPPO.algorithm ):
         entropy_coef = 0.01
@@ -146,7 +146,7 @@ class A1AMPCfgPPO( LeggedRobotCfgPPO ):
 
     class runner( LeggedRobotCfgPPO.runner ):
         run_name = ''
-        experiment_name = 'a1_amp_example'
+        experiment_name = 'gen3_amp_example'
         algorithm_class_name = 'AMPPPO'
         policy_class_name = 'ActorCritic'
         max_iterations = 500000 # number of policy updates
