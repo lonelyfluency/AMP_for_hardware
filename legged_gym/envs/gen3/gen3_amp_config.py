@@ -83,12 +83,6 @@ class gen3AMPCfg( LeggedRobotCfg ):
     class domain_rand:
         randomize_friction = True
         friction_range = [0.25, 1.75]
-        randomize_base_mass = True
-        added_mass_range = [-1., 1.]
-        push_robots = True
-        push_interval_s = 15
-        max_push_vel_xy = 1.0
-        randomize_gains = True
         stiffness_multiplier_range = [0.9, 1.1]
         damping_multiplier_range = [0.9, 1.1]
 
@@ -96,16 +90,13 @@ class gen3AMPCfg( LeggedRobotCfg ):
         add_noise = True
         noise_level = 1.0 # scales other values
         class noise_scales:
-            dof_pos = 0.03
-            dof_vel = 1.5
-            lin_vel = 0.1
-            ang_vel = 0.3
+            lin_vel = 0.05
+            ang_vel = 0.1
             gravity = 0.05
             height_measurements = 0.1
 
     class rewards( LeggedRobotCfg.rewards ):
         soft_dof_pos_limit = 0.9
-        base_height_target = 0.25
         class scales( LeggedRobotCfg.rewards.scales ):
             termination = 0.0
             tracking_lin_vel = 1.5 * 1. / (.005 * 6)
@@ -116,24 +107,22 @@ class gen3AMPCfg( LeggedRobotCfg ):
             torques = 0.0
             dof_vel = 0.0
             dof_acc = 0.0
-            base_height = 0.0 
-            feet_air_time =  0.0
             collision = 0.0
-            feet_stumble = 0.0 
             action_rate = 0.0
-            stand_still = 0.0
-            dof_pos_limits = 0.0
 
     class commands:
         curriculum = False
         max_curriculum = 1.
-        num_commands = 4 # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
+        num_commands = 6 # default: tip_x, tip_y, tip_z, tip_a, tip_b, tip_c
         resampling_time = 10. # time before command are changed[s]
         heading_command = False # if true: compute ang vel command from heading error
         class ranges:
-            lin_vel_x = [-1.0, 2.0] # min max [m/s]
+            lin_vel_x = [-0.3, 0.3] # min max [m/s]
             lin_vel_y = [-0.3, 0.3]   # min max [m/s]
-            ang_vel_yaw = [-1.57, 1.57]    # min max [rad/s]
+            lin_vel_z = [-0.3, 0.3]   # min max [m/s]
+            ang_vel_a = [-1.57, 1.57]    # min max [rad/s]
+            ang_vel_b = [-1.57, 1.57]    # min max [rad/s]
+            ang_vel_c = [-1.57, 1.57]    # min max [rad/s]
             heading = [-3.14, 3.14]
 
 class gen3AMPCfgPPO( LeggedRobotCfgPPO ):
