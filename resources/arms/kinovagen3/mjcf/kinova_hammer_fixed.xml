@@ -91,6 +91,7 @@
     <worldbody>
         <geom type="mesh" rgba="0.75294 0.75294 0.75294 1" mesh="base_link" />
         <geom size="0.6925 0.4275 0.44" pos="0.4 0 -0.44" type="box" rgba="0.4 0.4 0.4 1" />
+        <site name="gcs" pos="0 0 0"/>
         <body name="shoulder_link" pos="0 0 0.15643" quat="-3.67321e-06 1 0 0">
             <inertial pos="-2.3e-05 -0.010364 -0.07336" quat="0.707051 0.0451246 -0.0453544 0.704263" mass="1.3773" diaginertia="0.00488868 0.00457 0.00135132" />
             <joint name="joint_1" pos="0 0 0" axis="0 0 1" class="gen3driver"/>
@@ -125,6 +126,7 @@
                                         <body name="base" pos="0 0 0.0038" quat="1 0 0 -1">
                                             <inertial mass="0.777441" pos="0 -2.70394e-05 0.0354675" quat="1 -0.00152849 0 0"
                                                 diaginertia="0.000260285 0.000225381 0.000152708"/>
+                                            <site name="hand" pos="0 0 0"/>
                                             <geom class="visual" mesh="base" material="black"/>
                                             <geom class="collision" mesh="base"/>
                                             <!-- Right-hand side 4-bar linkage -->
@@ -213,6 +215,8 @@
                                             <body name="hammer" pos="0.08 0.052 0.155" quat="0 0.707 -0.707 0">
                                                 <geom type="mesh" density="7850" friction="0.7" solimp="0.95 0.99 0.001" solref="0.004 1" priority="1" rgba="0.58 0.58 0.58 1" mesh="hammer_handle" />
                                                 <geom type="mesh" density="7850" friction="0.7" solimp="0.95 0.99 0.001" solref="0.004 1" priority="1" rgba="0.58 0.58 0.58 1" mesh="hammer_head_front" />
+                                                <site name="hammer_head" pos="0 0 0" size="0.015 0.015 0.015" type="sphere" rgba="1 1 1 0.1"/>
+                                                <site name="hammer_tip" pos="0 0 0" size="0.005 0.005 0.005" type="sphere" rgba="1 1 1 0.1"/>
                                                 <geom type="mesh" density="7850" friction="0.7" solimp="0.95 0.99 0.001" solref="0.004 1" priority="1" rgba="0.58 0.58 0.58 1" mesh="hammer_head_left" />
                                                 <geom type="mesh" density="7850" friction="0.7" solimp="0.95 0.99 0.001" solref="0.004 1" priority="1" rgba="0.58 0.58 0.58 1" mesh="hammer_head_right" />
                                             </body>
@@ -232,6 +236,7 @@
             <inertial pos="0.035 -0.03 0.075" quat="1 0 0 0" mass="20" diaginertia="0.03 0.03 0.03" />
             <joint name="joint_nail" type="free" />
             <geom type="mesh" friction="0.7" solimp="0.95 0.99 0.001" solref="0.004 1" priority="1" rgba="0.58 0.58 0.58 1" mesh="nail_head" />
+            <site name="nail_head_pos" pos="0 0 0" size="0.01 0.01 0.01" type="sphere" rgba="1 1 1 0.1"/>
             <geom type="mesh" friction="0.7" solimp="0.95 0.99 0.001" solref="0.004 1" priority="1" rgba="0.58 0.58 0.58 1" mesh="nail_down" />
             <geom type="mesh" friction="0.7" solimp="0.95 0.99 0.001" solref="0.004 1" priority="1" rgba="0.58 0.58 0.58 1" mesh="nail_tool" />
         </body>
@@ -288,11 +293,32 @@
         <motor name="motor_6" joint="joint_6" gear="70"/>
         <motor name="motor_7" joint="joint_7" gear="20"/>
 
-        
-
-        <!-- <general class="2f85" name="fingers_actuator" tendon="split" forcerange="-5 5"
-            ctrlrange="200 255" gainprm="0.3137255 0 0" biasprm="0 -100 -10"/> -->
+        <general class="2f85" name="fingers_actuator" tendon="split" forcerange="-5 5"
+            ctrlrange="200 255" gainprm="0.3137255 0 0" biasprm="0 -100 -10"/>
 
     </actuator>
+
+    <sensor>
+
+        <!-- hand pos -->
+        <framepos name="hand_pos" objtype="site" objname="hand" reftype="site" refname="gcs"/>
+
+        <!-- hand quat -->
+        <framequat name="hand_quat" objtype="site" objname="hand" reftype="site" refname="gcs"/>
+
+        <!-- nail pos -->
+        <framepos name="nail_pos" objtype="site" objname="nail_head_pos" reftype="site" refname="gcs"/>
+
+        <!-- hand acc  -->
+        <accelerometer name="hand_acc" site="hand"/>
+
+        <!-- hand velocity -->
+        <velocimeter name="hand_velo" site="hand"/>
+
+        <!-- endeffector touch and force -->
+        <touch name="hammer_head_force" site="hammer_head" />
+
+    </sensor>
+    
 
 </mujoco>
