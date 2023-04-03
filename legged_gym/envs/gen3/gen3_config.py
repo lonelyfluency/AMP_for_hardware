@@ -65,7 +65,7 @@ class gen3RoughCfg( LeggedRobotCfg ):
         decimation = 4
 
     class asset( LeggedRobotCfg.asset ):
-        file = '{LEGGED_GYM_ROOT_DIR}/resources/arms/kinovagen3/mjcf/kinova_hammer_fixed.xml'
+        file = '{LEGGED_GYM_ROOT_DIR}/resources/arms/kinovagen3/mjcf/kinova_hammer_isaacsim.xml'
         tip_name = "hammer"
         penalize_contacts_on = ["half_arm_1_link", "half_arm_2_link","forearm_link", "spherical_wrist_1_link","spherical_wrist_2_link", "bracelet_link"]
         terminate_after_contacts_on = ["hammer"]

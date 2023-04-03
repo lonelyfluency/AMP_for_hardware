@@ -7,7 +7,7 @@ import KinovaGen3
 
 class TestArm:
     def __init__(self) -> None:
-        self.model = mujoco.MjModel.from_xml_path(f"./resources/arms/kinovagen3/mjcf/kinova_hammer_fixed.xml")
+        self.model = mujoco.MjModel.from_xml_path(f"./resources/arms/kinovagen3/mjcf/kinova_hammer_isaacsim.xml")
         self.data = mujoco.MjData(self.model)
         self.viewer = mujoco_viewer.MujocoViewer(self.model, self.data)
 
@@ -62,13 +62,13 @@ class TestArm:
     
     def direct_dof_pos_control(self,joint_ang):
         self.data.qpos[:7] = joint_ang
-        ctrl = np.zeros(8)
+        ctrl = np.zeros(7)
         self.step(ctrl)
         self.render()
     
     def direct_dof_vel_control(self,joint_vel):
         self.data.qvel[:7] = joint_vel
-        ctrl = np.zeros(8)
+        ctrl = np.zeros(7)
         self.step(ctrl)
         self.render()
 
