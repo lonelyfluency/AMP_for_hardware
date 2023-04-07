@@ -85,7 +85,8 @@ viewer = gym.create_viewer(sim, gymapi.CameraProperties())
 if viewer is None:
     raise Exception("Failed to create viewer")
 
-asset_root = "../../assets"
+# asset_root = "../../assets"
+asset_root = "./resources/arms/kinovagen3"
 
 # create table asset
 table_dims = gymapi.Vec3(0.6, 1.0, 0.4)
@@ -93,20 +94,25 @@ asset_options = gymapi.AssetOptions()
 asset_options.fix_base_link = True
 table_asset = gym.create_box(sim, table_dims.x, table_dims.y, table_dims.z, asset_options)
 
-# create box asset
-box_size = 0.045
-asset_options = gymapi.AssetOptions()
-box_asset = gym.create_box(sim, box_size, box_size, box_size, asset_options)
+# # create box asset
+# box_size = 0.045
+# asset_options = gymapi.AssetOptions()
+# box_asset = gym.create_box(sim, box_size, box_size, box_size, asset_options)
 
 # load kinova asset
-kinova_asset_file = "urdf/kinova_gen3/urdf/GEN3_URDF_V12.urdf"
-kinova_asset_file = "mjcf/mjcf/kinova_hammer_isaacsim.xml"
+kinova_asset_file = "mjcf/kinova_hammer_isaacsim_joint.xml"
 asset_options = gymapi.AssetOptions()
 asset_options.armature = 0.01
 asset_options.fix_base_link = True
 asset_options.disable_gravity = True
 asset_options.flip_visual_attachments = False
 kinova_asset = gym.load_asset(sim, asset_root, kinova_asset_file, asset_options)
+
+# load nail asset
+nail_size = 0.03
+nail_asset_file = "mjcf/nail.xml"
+asset_options = gymapi.AssetOptions()
+nail_asset = gym.load_asset(sim,asset_root,nail_asset_file,asset_options)
 
 # configure kinova dofs
 kinova_dof_props = gym.get_asset_dof_properties(kinova_asset)
@@ -121,7 +127,7 @@ for i in range(len(kinova_upper_limits)):
     if kinova_upper_limits[i]>math.pi:
         kinova_upper_limits[i]=math.pi
 kinova_ranges = kinova_upper_limits - kinova_lower_limits
-kinova_mids = [0.0, -1.0, 0.0, +2.6, -1.57, 0.0]
+kinova_mids = [0.0, -1.0, 0.0, +2.6, -1.57, 0.0,0,0,0,0,0,0,0,0,0]
 
 # use position drive for all dofs
 kinova_dof_props["driveMode"].fill(gymapi.DOF_MODE_POS)
@@ -155,9 +161,11 @@ table_pose = gymapi.Transform()
 table_pose.p = gymapi.Vec3(0.5, 0.0, 0.5 * table_dims.z)
 
 box_pose = gymapi.Transform()
+nail_pose = gymapi.Transform()
 
 envs = []
-box_idxs = []
+# box_idxs = []
+nail_idxs = []
 hand_idxs = []
 init_pos_list = []
 init_rot_list = []
@@ -176,18 +184,32 @@ for i in range(num_envs):
     # add table
     table_handle = gym.create_actor(env, table_asset, table_pose, "table", i, 0)
 
-    # add box
-    box_pose.p.x = table_pose.p.x + np.random.uniform(-0.2, 0.1)
-    box_pose.p.y = table_pose.p.y + np.random.uniform(-0.3, 0.3)
-    box_pose.p.z = table_dims.z + 0.5 * box_size
-    box_pose.r = gymapi.Quat.from_axis_angle(gymapi.Vec3(0, 0, 1), np.random.uniform(-math.pi, math.pi))
-    box_handle = gym.create_actor(env, box_asset, box_pose, "box", i, 0)
-    color = gymapi.Vec3(np.random.uniform(0, 1), np.random.uniform(0, 1), np.random.uniform(0, 1))
-    gym.set_rigid_body_color(env, box_handle, 0, gymapi.MESH_VISUAL_AND_COLLISION, color)
+    # # add box
+    # box_pose.p.x = table_pose.p.x + np.random.uniform(-0.2, 0.1)
+    # box_pose.p.y = table_pose.p.y + np.random.uniform(-0.3, 0.3)
+    # box_pose.p.z = table_dims.z + 0.5 * box_size *2
+    # box_pose.r = gymapi.Quat.from_axis_angle(gymapi.Vec3(0, 0, 1), np.random.uniform(-math.pi, math.pi))
+    # box_handle = gym.create_actor(env, box_asset, box_pose, "box", i, 0)
+    # color = gymapi.Vec3(np.random.uniform(0, 1), np.random.uniform(0, 1), np.random.uniform(0, 1))
+    # gym.set_rigid_body_color(env, box_handle, 0, gymapi.MESH_VISUAL_AND_COLLISION, color)
 
-    # get global index of box in rigid body state tensor
-    box_idx = gym.get_actor_rigid_body_index(env, box_handle, 0, gymapi.DOMAIN_SIM)
-    box_idxs.append(box_idx)
+    # add nail
+    nail_pose.p.x = table_pose.p.x + np.random.uniform(-0.2, 0.1)
+    nail_pose.p.y = table_pose.p.y + np.random.uniform(-0.3, 0.3)
+    nail_pose.p.z = table_dims.z + 0.5 * nail_size
+    nail_pose.r = gymapi.Quat.from_axis_angle(gymapi.Vec3(0, 0, 1), np.random.uniform(-math.pi, math.pi))
+    nail_handle = gym.create_actor(env, nail_asset, nail_pose, "nail", i, 0)
+    color = gymapi.Vec3(np.random.uniform(0, 1), np.random.uniform(0, 1), np.random.uniform(0, 1))
+    gym.set_rigid_body_color(env, nail_handle, 0, gymapi.MESH_VISUAL_AND_COLLISION, color)
+
+
+    # # get global index of box in rigid body state tensor
+    # box_idx = gym.get_actor_rigid_body_index(env, box_handle, 0, gymapi.DOMAIN_SIM)
+    # box_idxs.append(box_idx)
+
+    # get global index of nail in rigid body state tensor
+    nail_idx = gym.get_actor_rigid_body_index(env, nail_handle, 0, gymapi.DOMAIN_SIM)
+    nail_idxs.append(nail_idx)
 
     # add kinova
     kinova_handle = gym.create_actor(env, kinova_asset, kinova_pose, "kinova", i, 2)
@@ -229,7 +251,7 @@ init_rot = torch.Tensor(init_rot_list).view(num_envs, 4).to(device)
 down_q = torch.stack(num_envs * [torch.tensor([1.0, 0.0, 0.0, 0.0])]).to(device).view((num_envs, 4))
 
 # box corner coords, used to determine grasping yaw
-box_half_size = 0.5 * box_size
+box_half_size = 0.5 * nail_size
 corner_coord = torch.Tensor([box_half_size, box_half_size, box_half_size])
 corners = torch.stack(num_envs * [corner_coord]).to(device)
 
@@ -251,7 +273,7 @@ rb_states = gymtorch.wrap_tensor(_rb_states)
 # get dof state tensor
 _dof_states = gym.acquire_dof_state_tensor(sim)
 dof_states = gymtorch.wrap_tensor(_dof_states)
-dof_pos = dof_states[:, 0].view(num_envs, 6, 1)
+dof_pos = dof_states[:, 0].view(num_envs, 15, 1)
 
 # Create a tensor noting whether the hand should return to the initial position
 hand_restart = torch.full([num_envs], False, dtype=torch.bool).to(device)
@@ -270,16 +292,16 @@ while not gym.query_viewer_has_closed(viewer):
     gym.refresh_jacobian_tensors(sim)
     if counter==100:
         counter=0
-        box_pos = rb_states[box_idxs, :3]
-        box_rot = rb_states[box_idxs, 3:7]
+        nail_pos = rb_states[nail_idxs, :3]
+        nail_rot = rb_states[nail_idxs, 3:7]
 
         hand_pos = rb_states[hand_idxs, :3]
         hand_rot = rb_states[hand_idxs, 3:7]
 
-        to_box = box_pos - hand_pos
-        box_dist = torch.norm(to_box, dim=-1).unsqueeze(-1)
-        box_dir = to_box / box_dist
-        box_dot = box_dir @ down_dir.view(3, 1)
+        to_nail = nail_pos - hand_pos
+        nail_dist = torch.norm(to_nail, dim=-1).unsqueeze(-1)
+        nail_dir = to_nail / nail_dist
+        nail_dot = nail_dir @ down_dir.view(3, 1)
 
         # how far the hand should be from box for grasping
         grasp_offset = 0.12
@@ -288,10 +310,10 @@ while not gym.query_viewer_has_closed(viewer):
         # gripper_sep = dof_pos[:, 7] + dof_pos[:, 8]
         # gripped = (gripper_sep < 0.045) & (box_dist < grasp_offset + 0.5 * box_size)
 
-        yaw_q = cube_grasping_yaw(box_rot, corners)
-        box_yaw_dir = quat_axis(yaw_q, 0)
+        yaw_q = cube_grasping_yaw(nail_rot, corners)
+        nail_yaw_dir = quat_axis(yaw_q, 0)
         hand_yaw_dir = quat_axis(hand_rot, 0)
-        yaw_dot = torch.bmm(box_yaw_dir.view(num_envs, 1, 3), hand_yaw_dir.view(num_envs, 3, 1)).squeeze(-1)
+        yaw_dot = torch.bmm(nail_yaw_dir.view(num_envs, 1, 3), hand_yaw_dir.view(num_envs, 3, 1)).squeeze(-1)
 
         # determine if we have reached the initial position; if so allow the hand to start moving to the box
         to_init = init_pos - hand_pos
@@ -301,9 +323,9 @@ while not gym.query_viewer_has_closed(viewer):
         
         # if hand is above box, descend to grasp offset
         # otherwise, seek a position above the box
-        above_box = ((box_dot >= 0.99) & (yaw_dot >= 0.95) & (box_dist < grasp_offset * 3)).squeeze(-1)
-        grasp_pos = box_pos.clone()
-        grasp_pos[:, 2] = torch.where(above_box, box_pos[:, 2] + grasp_offset, box_pos[:, 2] + grasp_offset * 2.5)
+        above_box = ((nail_dot >= 0.99) & (yaw_dot >= 0.95) & (nail_dist < grasp_offset * 3)).squeeze(-1)
+        grasp_pos = nail_pos.clone()
+        grasp_pos[:, 2] = torch.where(above_box, nail_pos[:, 2] + grasp_offset, nail_pos[:, 2] + grasp_offset * 2.5)
 
         # compute goal position and orientation
         goal_pos = torch.where(return_to_start, init_pos, grasp_pos)
@@ -318,7 +340,7 @@ while not gym.query_viewer_has_closed(viewer):
         j_eef_T = torch.transpose(j_eef, 1, 2)
         d = 0.05  # damping term
         lmbda = torch.eye(6).to(device) * (d ** 2)
-        u = (j_eef_T @ torch.inverse(j_eef @ j_eef_T + lmbda) @ dpose).view(num_envs, 6, 1)
+        u = (j_eef_T @ torch.inverse(j_eef @ j_eef_T + lmbda) @ dpose).view(num_envs, 15, 1)
         print(dof_pos.shape)
         print(u.shape)
         # update position targets
