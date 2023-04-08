@@ -147,7 +147,7 @@ kinova_link_dict = gym.get_asset_rigid_body_dict(kinova_asset)
 kinova_hand_index = kinova_link_dict["bracelet_link"] # todo change with end effector
 
 # configure env grid
-num_envs = 64
+num_envs = 1
 num_per_row = int(math.sqrt(num_envs))
 spacing = 1.0
 env_lower = gymapi.Vec3(-spacing, -spacing, 0.0)
@@ -167,8 +167,11 @@ envs = []
 # box_idxs = []
 nail_idxs = []
 hand_idxs = []
+hammer_idxs = []
 init_pos_list = []
 init_rot_list = []
+hammer_pos_list = []
+hammer_rot_list = []
 
 # add ground plane
 plane_params = gymapi.PlaneParams()
@@ -233,6 +236,16 @@ for i in range(num_envs):
     hand_idx = gym.find_actor_rigid_body_index(env, kinova_handle, "bracelet_link", gymapi.DOMAIN_SIM)
     hand_idxs.append(hand_idx)
 
+    # get initial hammer pose
+    hammer_handle = gym.find_actor_rigid_body_handle(env, kinova_handle, "hammer")
+    hammer_pose = gym.get_rigid_transform(env, hammer_handle)
+    hammer_pos_list.append([hammer_pose.p.x, hammer_pose.p.y, hammer_pose.p.z])
+    hammer_rot_list.append([hammer_pose.r.x, hammer_pose.r.y, hammer_pose.r.z, hammer_pose.r.w])
+
+    # get golbal index of hammer in rigid body state tensor
+    hammer_idx = gym.find_actor_rigid_body_index(env, kinova_handle, "hammer", gymapi.DOMAIN_SIM)
+    hammer_idxs.append(hammer_idx)
+
 # point camera at middle env
 cam_pos = gymapi.Vec3(4, 3, 2)
 cam_target = gymapi.Vec3(-4, -3, 0)
@@ -249,6 +262,10 @@ init_rot = torch.Tensor(init_rot_list).view(num_envs, 4).to(device)
 
 # hand orientation for grasping
 down_q = torch.stack(num_envs * [torch.tensor([1.0, 0.0, 0.0, 0.0])]).to(device).view((num_envs, 4))
+
+# initial hammer position and orientation tensors
+init_hammer_pos = torch.Tensor(hammer_pos_list).view(num_envs, 3).to(device)
+init_hammer_rot = torch.Tensor(hammer_rot_list).view(num_envs, 4).to(device)
 
 # box corner coords, used to determine grasping yaw
 box_half_size = 0.5 * nail_size
@@ -290,13 +307,23 @@ while not gym.query_viewer_has_closed(viewer):
     gym.refresh_rigid_body_state_tensor(sim)
     gym.refresh_dof_state_tensor(sim)
     gym.refresh_jacobian_tensors(sim)
-    if counter==100:
+    if counter==50:
         counter=0
         nail_pos = rb_states[nail_idxs, :3]
         nail_rot = rb_states[nail_idxs, 3:7]
 
         hand_pos = rb_states[hand_idxs, :3]
         hand_rot = rb_states[hand_idxs, 3:7]
+
+        hammer_pos = rb_states[hammer_idxs, :3]
+        hammer_rot = rb_states[hammer_idxs, 3:7]
+
+        print("hand_pos: ", hand_pos)
+        print("hand_rot: ", hand_rot)
+        print("hammer_pos: ", hammer_pos)
+        print("hammer_rot: ", hammer_rot)
+        print("nail_pos: ", nail_pos)
+        print("nail_rot: ", nail_rot)
 
         to_nail = nail_pos - hand_pos
         nail_dist = torch.norm(to_nail, dim=-1).unsqueeze(-1)
