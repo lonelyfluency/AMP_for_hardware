@@ -285,6 +285,7 @@
         <!-- hand velocity -->
         <velocimeter name="hand_velo" site="hand"/>
 
+        <!-- <framepos name="hammer_head" objtype="site" > -->
         <!-- endeffector touch and force -->
         <touch name="hammer_head_force" site="hammer_head" />
 
