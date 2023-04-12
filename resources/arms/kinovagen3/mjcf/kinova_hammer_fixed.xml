@@ -228,10 +228,10 @@
                                                 </body>
                                             </body>
                                             
-                                            <!-- <site name="tail" pos="0.09 0 0.14" size="0.005 0.005 0.005" type="box" rgba="0 0 1 0.3" group="1"/>
+                                            <site name="tail" pos="0.09 0 0.14" size="0.005 0.005 0.005" type="box" rgba="0 0 1 0.3" group="1"/>
                                             <site name="mid" pos="-0.15 0 0.14" size="0.005 0.005 0.005" type="box" rgba="0 0 1 0.3" group="1"/>
                                             <site name="head" pos="-0.145 0 0.19" size="0.005 0.005 0.005" type="box" rgba="0 0 1 0.3" group="1"/>
-                                            <site name="claw" pos="-0.145 0 0.095" size="0.005 0.005 0.005" type="box" rgba="0 0 1 0.3" group="1"/> -->
+                                            <site name="claw" pos="-0.145 0 0.095" size="0.005 0.005 0.005" type="box" rgba="0 0 1 0.3" group="1"/>
                                             <!-- hammer -->
                                             <body name="hammer" pos="0.095 -0.0155 0.191" quat="-0.50 0.5 -0.5 -0.5">
                                                 <geom type="mesh" density="7850" friction="0.7" solimp="0.95 0.99 0.001" solref="0.004 1" priority="1" rgba="0.58 0.58 0.58 1" group="3" mesh="hammer_handle" />

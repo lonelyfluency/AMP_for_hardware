@@ -14,49 +14,19 @@ from rsl_rl.datasets import motion_util
 
 class AMPLoader:
 
-    POS_SIZE = 3
-    ROT_SIZE = 4
-    JOINT_POS_SIZE = 12
-    TAR_TOE_POS_LOCAL_SIZE = 12
-    LINEAR_VEL_SIZE = 3
-    ANGULAR_VEL_SIZE = 3
-    JOINT_VEL_SIZE = 12
-    TAR_TOE_VEL_LOCAL_SIZE = 12
+    POS_SIZE = 2
+    ROT_SIZE = 1
 
-    ROOT_POS_START_IDX = 0
-    ROOT_POS_END_IDX = ROOT_POS_START_IDX + POS_SIZE
-
-    ROOT_ROT_START_IDX = ROOT_POS_END_IDX
-    ROOT_ROT_END_IDX = ROOT_ROT_START_IDX + ROT_SIZE
-
-    JOINT_POSE_START_IDX = ROOT_ROT_END_IDX
-    JOINT_POSE_END_IDX = JOINT_POSE_START_IDX + JOINT_POS_SIZE
-
-    TAR_TOE_POS_LOCAL_START_IDX = JOINT_POSE_END_IDX
-    TAR_TOE_POS_LOCAL_END_IDX = TAR_TOE_POS_LOCAL_START_IDX + TAR_TOE_POS_LOCAL_SIZE
-
-    LINEAR_VEL_START_IDX = TAR_TOE_POS_LOCAL_END_IDX
-    LINEAR_VEL_END_IDX = LINEAR_VEL_START_IDX + LINEAR_VEL_SIZE
-
-    ANGULAR_VEL_START_IDX = LINEAR_VEL_END_IDX
-    ANGULAR_VEL_END_IDX = ANGULAR_VEL_START_IDX + ANGULAR_VEL_SIZE
-
-    JOINT_VEL_START_IDX = ANGULAR_VEL_END_IDX
-    JOINT_VEL_END_IDX = JOINT_VEL_START_IDX + JOINT_VEL_SIZE
-
-    TAR_TOE_VEL_LOCAL_START_IDX = JOINT_VEL_END_IDX
-    TAR_TOE_VEL_LOCAL_END_IDX = TAR_TOE_VEL_LOCAL_START_IDX + TAR_TOE_VEL_LOCAL_SIZE
 
     def __init__(
             self,
             device,
             time_between_frames,
-            data_dir='',
             preload_transitions=False,
             num_preload_transitions=1000000,
-            motion_files=glob.glob('datasets/mocap_motions/*'),
+            motion_files=glob.glob('datasets/hammer_motions/*'),
             ):
-        """Expert dataset provides AMP observations from Dog mocap dataset.
+        """Expert dataset provides AMP observations from hammer motion dataset.
 
         time_between_frames: Amount of time in seconds between transition.
         """
@@ -78,34 +48,29 @@ class AMPLoader:
             with open(motion_file, "r") as f:
                 motion_json = json.load(f)
                 motion_data = np.array(motion_json["Frames"])
-                motion_data = self.reorder_from_pybullet_to_isaac(motion_data)
 
-                # Normalize and standardize quaternions.
-                for f_i in range(motion_data.shape[0]):
-                    root_rot = AMPLoader.get_root_rot(motion_data[f_i])
-                    root_rot = pose3d.QuaternionNormalize(root_rot)
-                    root_rot = motion_util.standardize_quaternion(root_rot)
-                    motion_data[
-                        f_i,
-                        AMPLoader.POS_SIZE:
-                            (AMPLoader.POS_SIZE +
-                             AMPLoader.ROT_SIZE)] = root_rot
+                # # Normalize and standardize quaternions.
+                # for f_i in range(motion_data.shape[0]):
+                #     root_rot = AMPLoader.get_root_rot(motion_data[f_i])
+                #     root_rot = pose3d.QuaternionNormalize(root_rot)
+                #     root_rot = motion_util.standardize_quaternion(root_rot)
+                #     motion_data[
+                #         f_i,
+                #         AMPLoader.POS_SIZE:
+                #             (AMPLoader.POS_SIZE +
+                #              AMPLoader.ROT_SIZE)] = root_rot
                 
-                # Remove first 7 observation dimensions (root_pos and root_orn).
+                # Remove first 2 observation dimensions (root_pos).
                 self.trajectories.append(torch.tensor(
-                    motion_data[
-                        :,
-                        AMPLoader.ROOT_ROT_END_IDX:AMPLoader.JOINT_VEL_END_IDX
-                    ], dtype=torch.float32, device=device))
-                self.trajectories_full.append(torch.tensor(
-                        motion_data[:, :AMPLoader.JOINT_VEL_END_IDX],
-                        dtype=torch.float32, device=device))
+                    motion_data[:, 
+                                AMPLoader.POS_SIZE:
+                                ], dtype=torch.float32, device=device))
+                self.trajectories_full.append(torch.tensor(motion_data,dtype=torch.float32, device=device))
                 self.trajectory_idxs.append(i)
-                self.trajectory_weights.append(
-                    float(motion_json["MotionWeight"]))
+                self.trajectory_weights.append(0.5)
                 frame_duration = float(motion_json["FrameDuration"])
                 self.trajectory_frame_durations.append(frame_duration)
-                traj_len = (motion_data.shape[0] - 1) * frame_duration
+                traj_len = float(motion_json["MotionLength"])
                 self.trajectory_lens.append(traj_len)
                 self.trajectory_num_frames.append(float(motion_data.shape[0]))
 
@@ -130,37 +95,6 @@ class AMPLoader:
 
         self.all_trajectories_full = torch.vstack(self.trajectories_full)
 
-    def reorder_from_pybullet_to_isaac(self, motion_data):
-        """Convert from PyBullet ordering to Isaac ordering.
-
-        Rearranges leg and joint order from PyBullet [FR, FL, RR, RL] to
-        IsaacGym order [FL, FR, RL, RR].
-        """
-        root_pos = AMPLoader.get_root_pos_batch(motion_data)
-        root_rot = AMPLoader.get_root_rot_batch(motion_data)
-
-        jp_fr, jp_fl, jp_rr, jp_rl = np.split(
-            AMPLoader.get_joint_pose_batch(motion_data), 4, axis=1)
-        joint_pos = np.hstack([jp_fl, jp_fr, jp_rl, jp_rr])
-    
-        fp_fr, fp_fl, fp_rr, fp_rl = np.split(
-            AMPLoader.get_tar_toe_pos_local_batch(motion_data), 4, axis=1)
-        foot_pos = np.hstack([fp_fl, fp_fr, fp_rl, fp_rr])
-
-        lin_vel = AMPLoader.get_linear_vel_batch(motion_data)
-        ang_vel = AMPLoader.get_angular_vel_batch(motion_data)
-
-        jv_fr, jv_fl, jv_rr, jv_rl = np.split(
-            AMPLoader.get_joint_vel_batch(motion_data), 4, axis=1)
-        joint_vel = np.hstack([jv_fl, jv_fr, jv_rl, jv_rr])
-
-        fv_fr, fv_fl, fv_rr, fv_rl = np.split(
-            AMPLoader.get_tar_toe_vel_local_batch(motion_data), 4, axis=1)
-        foot_vel = np.hstack([fv_fl, fv_fr, fv_rl, fv_rr])
-
-        return np.hstack(
-            [root_pos, root_rot, joint_pos, foot_pos, lin_vel, ang_vel,
-             joint_vel, foot_vel])
 
     def weighted_traj_idx_sample(self):
         """Get traj idx via weighted sampling."""
@@ -347,56 +281,8 @@ class AMPLoader:
     @property
     def num_motions(self):
         return len(self.trajectory_names)
-
-    def get_root_pos(pose):
-        return pose[AMPLoader.ROOT_POS_START_IDX:AMPLoader.ROOT_POS_END_IDX]
-
-    def get_root_pos_batch(poses):
-        return poses[:, AMPLoader.ROOT_POS_START_IDX:AMPLoader.ROOT_POS_END_IDX]
-
-    def get_root_rot(pose):
-        return pose[AMPLoader.ROOT_ROT_START_IDX:AMPLoader.ROOT_ROT_END_IDX]
-
-    def get_root_rot_batch(poses):
-        return poses[:, AMPLoader.ROOT_ROT_START_IDX:AMPLoader.ROOT_ROT_END_IDX]
-
-    def get_joint_pose(pose):
-        return pose[AMPLoader.JOINT_POSE_START_IDX:AMPLoader.JOINT_POSE_END_IDX]
-
-    def get_joint_pose_batch(poses):
-        return poses[:, AMPLoader.JOINT_POSE_START_IDX:AMPLoader.JOINT_POSE_END_IDX]
-
-    def get_tar_toe_pos_local(pose):
-        return pose[AMPLoader.TAR_TOE_POS_LOCAL_START_IDX:AMPLoader.TAR_TOE_POS_LOCAL_END_IDX]
-
-    def get_tar_toe_pos_local_batch(poses):
-        return poses[:, AMPLoader.TAR_TOE_POS_LOCAL_START_IDX:AMPLoader.TAR_TOE_POS_LOCAL_END_IDX]
-
-    def get_linear_vel(pose):
-        return pose[AMPLoader.LINEAR_VEL_START_IDX:AMPLoader.LINEAR_VEL_END_IDX]
-
-    def get_linear_vel_batch(poses):
-        return poses[:, AMPLoader.LINEAR_VEL_START_IDX:AMPLoader.LINEAR_VEL_END_IDX]
-
-    def get_angular_vel(pose):
-        return pose[AMPLoader.ANGULAR_VEL_START_IDX:AMPLoader.ANGULAR_VEL_END_IDX]  
-
-    def get_angular_vel_batch(poses):
-        return poses[:, AMPLoader.ANGULAR_VEL_START_IDX:AMPLoader.ANGULAR_VEL_END_IDX]  
-
-    def get_joint_vel(pose):
-        return pose[AMPLoader.JOINT_VEL_START_IDX:AMPLoader.JOINT_VEL_END_IDX]
-
-    def get_joint_vel_batch(poses):
-        return poses[:, AMPLoader.JOINT_VEL_START_IDX:AMPLoader.JOINT_VEL_END_IDX]  
-
-    def get_tar_toe_vel_local(pose):
-        return pose[AMPLoader.TAR_TOE_VEL_LOCAL_START_IDX:AMPLoader.TAR_TOE_VEL_LOCAL_END_IDX]
-
-    def get_tar_toe_vel_local_batch(poses):
-        return poses[:, AMPLoader.TAR_TOE_VEL_LOCAL_START_IDX:AMPLoader.TAR_TOE_VEL_LOCAL_END_IDX]
     
 if __name__=="__main__":
     dataloader = AMPLoader(device="cpu", time_between_frames=0.021)
     print(len(dataloader.trajectories_full))
-    print(dataloader.get)
+    print(dataloader.trajectories)

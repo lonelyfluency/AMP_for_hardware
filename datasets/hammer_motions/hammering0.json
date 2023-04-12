@@ -22,7 +22,7 @@
                       "wrist": "-1",
                       "center": "wrist",
                       "hammer_handle": "center",
-                      "hammer_head": "hammer_handle",
+                       "hammer_head": "hammer_handle",
                       "effective_point": "hammer_head"
            },
            "Frames": [
