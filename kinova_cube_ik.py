@@ -126,7 +126,8 @@ kinova_upper_limits = kinova_dof_props["upper"]
 for i in range(len(kinova_upper_limits)):
     if kinova_upper_limits[i]>math.pi:
         kinova_upper_limits[i]=math.pi
-kinova_ranges = kinova_upper_limits - kinova_lower_limits
+kinova_ranges = kinova_upper_limits - kinova_lower_limits 
+# print(kinova_ranges)
 kinova_mids = [0.0, -1.0, 0.0, +2.6, -1.57, 0.0,0,0,0,0,0,0,0,0,0]
 
 # use position drive for all dofs
@@ -147,7 +148,7 @@ kinova_link_dict = gym.get_asset_rigid_body_dict(kinova_asset)
 kinova_hand_index = kinova_link_dict["bracelet_link"] # todo change with end effector
 
 # configure env grid
-num_envs = 1
+num_envs = 2
 num_per_row = int(math.sqrt(num_envs))
 spacing = 1.0
 env_lower = gymapi.Vec3(-spacing, -spacing, 0.0)
@@ -307,6 +308,7 @@ while not gym.query_viewer_has_closed(viewer):
     gym.refresh_rigid_body_state_tensor(sim)
     gym.refresh_dof_state_tensor(sim)
     gym.refresh_jacobian_tensors(sim)
+    print(counter)
     if counter==50:
         counter=0
         nail_pos = rb_states[nail_idxs, :3]
@@ -315,7 +317,7 @@ while not gym.query_viewer_has_closed(viewer):
         hand_pos = rb_states[hand_idxs, :3]
         hand_rot = rb_states[hand_idxs, 3:7]
 
-        hammer_pos = rb_states[hammer_idxs, :3]
+        hammer_pos = [hammer_idxs, :3]
         hammer_rot = rb_states[hammer_idxs, 3:7]
 
         print("hand_pos: ", hand_pos)
