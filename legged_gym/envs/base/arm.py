@@ -57,6 +57,11 @@ from rsl_rl.datasets.motion_loader import AMPLoader
 #     [-0.183, 0.047, 0.],
 #     [-0.183, -0.047, 0.]]) + COM_OFFSET
 
+HAND_2_HAMMERMID = torch.tensor([-0.15, 0, 0.14])
+HAND_2_HAMMERTAIL = torch.tensor([0.09, 0, 0.14])
+HAND_2_HAMMERHEAD = torch.tensor([-0.145, 0, 0.19])
+HAND_2_HAMMERTAIL = torch.tensor([0.09, 0, 0.14])
+HAND_2_HAMMERCLAW = torch.tensor([-0.145, 0, 0.095])
 
 class Arm(BaseTask):
     def __init__(self, cfg: ArmCfg, sim_params, physics_engine, sim_device, headless):
@@ -259,7 +264,7 @@ class Arm(BaseTask):
     def compute_observations(self):
         """ Computes observations
         """
-        self.privileged_obs_buf = torch.cat((  self.base_lin_vel * self.obs_scales.lin_vel,
+        self.privileged_obs_buf = torch.cat(( self.base_lin_vel * self.obs_scales.lin_vel,
                                     self.base_ang_vel  * self.obs_scales.ang_vel,
                                     self.projected_gravity,
                                     self.commands[:, :3] * self.commands_scale,
