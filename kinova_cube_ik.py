@@ -149,6 +149,7 @@ kinova_hand_index = kinova_link_dict["bracelet_link"] # todo change with end eff
 
 # configure env grid
 num_envs = 2
+num_dof = 15
 num_per_row = int(math.sqrt(num_envs))
 spacing = 1.0
 env_lower = gymapi.Vec3(-spacing, -spacing, 0.0)
@@ -308,7 +309,7 @@ while not gym.query_viewer_has_closed(viewer):
     gym.refresh_rigid_body_state_tensor(sim)
     gym.refresh_dof_state_tensor(sim)
     gym.refresh_jacobian_tensors(sim)
-    print(counter)
+    
     if counter==50:
         counter=0
         nail_pos = rb_states[nail_idxs, :3]
@@ -317,7 +318,7 @@ while not gym.query_viewer_has_closed(viewer):
         hand_pos = rb_states[hand_idxs, :3]
         hand_rot = rb_states[hand_idxs, 3:7]
 
-        hammer_pos = [hammer_idxs, :3]
+        hammer_pos = rb_states[hammer_idxs, :3]
         hammer_rot = rb_states[hammer_idxs, 3:7]
 
         print("hand_pos: ", hand_pos)
@@ -386,6 +387,29 @@ while not gym.query_viewer_has_closed(viewer):
 
         # set new position targets
         gym.set_dof_position_target_tensor(sim, gymtorch.unwrap_tensor(pos_target))
+
+        actor_root_state = gym.acquire_actor_root_state_tensor(sim)
+        dof_state_tensor = gym.acquire_dof_state_tensor(sim)
+        net_contact_forces = gym.acquire_net_contact_force_tensor(sim)
+        gym.refresh_dof_state_tensor(sim)
+        gym.refresh_actor_root_state_tensor(sim)
+        gym.refresh_net_contact_force_tensor(sim)
+
+        root_states = gymtorch.wrap_tensor(actor_root_state)
+        dof_state = gymtorch.wrap_tensor(dof_state_tensor)
+        dof_pos_ = dof_state.view(num_envs, num_dof, 2)[..., 0]
+        dof_vel = dof_state.view(num_envs, num_dof, 2)[..., 1]
+        base_quat = root_states[:, 3:7]
+
+        contact_forces = gymtorch.wrap_tensor(net_contact_forces).view(num_envs, -1, 3) # shape: num_envs, num_bodies, xyz axis
+
+        print("root_states: ",root_states)
+        print("dof_pos_: ",dof_pos_)
+        print("dof_vel: ",dof_vel)
+        print("base_quat: ",base_quat)
+        print("contact_forces: ",contact_forces)
+
+
     elif counter == 250:
          gym.set_dof_position_target_tensor(sim, gymtorch.unwrap_tensor(torch.cat([init_pos, init_rot], -1).unsqueeze(-1)))
     # update viewer
