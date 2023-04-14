@@ -80,7 +80,6 @@ class ArmCfg(BaseConfig):
             ang_vel_a = [-1.57, 1.57]    # min max [rad/s]
             ang_vel_b = [-1.57, 1.57]    # min max [rad/s]
             ang_vel_c = [-1.57, 1.57]    # min max [rad/s]
-            heading = [-3.14, 3.14]
 
     class init_state:
         pos = [0.0, 0.0, 1.] # x,y,z [m]
@@ -143,11 +142,12 @@ class ArmCfg(BaseConfig):
     class rewards:
         class scales:
             termination = -0.0
+            reach = 2.0
             tracking_lin_vel = 1.0
             tracking_ang_vel = 0.5
-            lin_vel_z = -2.0
-            ang_vel_xy = -0.05
-            orientation = -0.
+            # lin_vel_z = -2.0
+            # ang_vel_xy = -0.05
+            # orientation = -0.
             torques = -0.00001
             collision = -1.
             action_rate = -0.01
@@ -162,7 +162,7 @@ class ArmCfg(BaseConfig):
 
     class normalization:
         class obs_scales:
-            lin_vel = 2.0
+            lin_vel = 1.0
             ang_vel = 0.25
 
         clip_observations = 100.

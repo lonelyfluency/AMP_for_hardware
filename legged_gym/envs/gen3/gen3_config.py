@@ -29,11 +29,11 @@
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
 
 import numpy as np
-from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO
+from legged_gym.envs.base.arm_config import ArmCfg, ArmCfgPPO
 
-class gen3RoughCfg( LeggedRobotCfg ):
+class gen3RoughCfg( ArmCfg ):
 
-    class env( LeggedRobotCfg.env ):
+    class env( ArmCfg.env ):
         num_envs = 5480
         include_history_steps = None  # Number of steps of history to include.
         num_observations = 235
@@ -42,7 +42,7 @@ class gen3RoughCfg( LeggedRobotCfg ):
         # reference_state_initialization_prob = 0.85
         # amp_motion_files = MOTION_FILES
 
-    class init_state( LeggedRobotCfg.init_state ):
+    class init_state( ArmCfg.init_state ):
         pos = [0.0, 0.0, 0.44] # x,y,z [m]
         default_joint_angles = { # = target angles [rad] when action = 0.0
             'joint_1': 0,   # [rad]
@@ -54,7 +54,7 @@ class gen3RoughCfg( LeggedRobotCfg ):
             'joint_7': np.pi/2,     # [rad]
         }
 
-    class control( LeggedRobotCfg.control ):
+    class control( ArmCfg.control ):
         # PD Drive parameters:
         control_type = 'P'
         stiffness = {'joint': 20.}  # [N*m/rad]
@@ -64,22 +64,22 @@ class gen3RoughCfg( LeggedRobotCfg ):
         # decimation: Number of control action updates @ sim DT per policy DT
         decimation = 4
 
-    class asset( LeggedRobotCfg.asset ):
+    class asset( ArmCfg.asset ):
         file = '{LEGGED_GYM_ROOT_DIR}/resources/arms/kinovagen3/mjcf/kinova_hammer_isaacsim.xml'
         tip_name = "hammer"
         penalize_contacts_on = ["half_arm_1_link", "half_arm_2_link","forearm_link", "spherical_wrist_1_link","spherical_wrist_2_link", "bracelet_link"]
         terminate_after_contacts_on = ["hammer"]
         self_collisions = 1 # 1 to disable, 0 to enable...bitwise filter
   
-    class rewards( LeggedRobotCfg.rewards ):
+    class rewards( ArmCfg.rewards ):
         soft_dof_pos_limit = 0.9
-        class scales( LeggedRobotCfg.rewards.scales ):
+        class scales( ArmCfg.rewards.scales ):
             torques = -0.0002
 
-class gen3RoughCfgPPO( LeggedRobotCfgPPO ):
-    class algorithm( LeggedRobotCfgPPO.algorithm ):
+class gen3RoughCfgPPO( ArmCfgPPO ):
+    class algorithm( ArmCfgPPO.algorithm ):
         entropy_coef = 0.01
-    class runner( LeggedRobotCfgPPO.runner ):
+    class runner( ArmCfgPPO.runner ):
         run_name = ''
         experiment_name = 'rough_gen3'
 

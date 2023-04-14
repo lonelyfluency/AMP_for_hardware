@@ -28,7 +28,7 @@
 #
 # Copyright (c) 2023 RL2 Lab, SJTU, Changda Tian
 
-from legged_gym import LEGGED_GYM_ROOT_DIR, envs
+from legged_gym import LEGGED_GYM_ROOT_DIR, envs, ARM_ASSETS_DIR
 from time import time
 from warnings import WarningMessage
 import numpy as np
@@ -50,6 +50,7 @@ from .arm_config import ArmCfg
 from rsl_rl.datasets.motion_loader import AMPLoader
 
 
+
 # COM_OFFSET = torch.tensor([0.012731, 0.002186, 0.000515])
 # HIP_OFFSETS = torch.tensor([
 #     [0.183, 0.047, 0.],
@@ -58,7 +59,7 @@ from rsl_rl.datasets.motion_loader import AMPLoader
 #     [-0.183, -0.047, 0.]]) + COM_OFFSET
 
 HAND_2_HAMMERMID = torch.tensor([-0.15, 0, 0.14])
-HAND_2_HAMMERTAIL = torch.tensor([0.09, 0, 0.14])
+HAND_2_HAMMERGRASP = torch.tensor([0, 0, 0.14])
 HAND_2_HAMMERHEAD = torch.tensor([-0.145, 0, 0.19])
 HAND_2_HAMMERTAIL = torch.tensor([0.09, 0, 0.14])
 HAND_2_HAMMERCLAW = torch.tensor([-0.145, 0, 0.095])
@@ -607,7 +608,7 @@ class Arm(BaseTask):
         self.gym.refresh_net_contact_force_tensor(self.sim)
 
         # create some wrapper tensors for different slices
-        self.root_states = gymtorch.wrap_tensor(actor_root_state)
+        self.root_states = gymtorch.wrap_tensor( )
         self.dof_state = gymtorch.wrap_tensor(dof_state_tensor)
         self.dof_pos = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 0]
         self.dof_vel = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 1]
@@ -628,8 +629,8 @@ class Arm(BaseTask):
         self.last_actions = torch.zeros(self.num_envs, self.num_actions, dtype=torch.float, device=self.device, requires_grad=False)
         self.last_dof_vel = torch.zeros_like(self.dof_vel)
         self.last_hand_vel = torch.zeros_like(self.root_states[:, 7:13])
-        self.commands = torch.zeros(self.num_envs, self.cfg.commands.num_commands, dtype=torch.float, device=self.device, requires_grad=False) # x vel, y vel, yaw vel, heading
-        self.commands_scale = torch.tensor([self.obs_scales.lin_vel, self.obs_scales.lin_vel, self.obs_scales.ang_vel], device=self.device, requires_grad=False,) # TODO change this
+        self.commands = torch.zeros(self.num_envs, self.cfg.commands.num_commands, dtype=torch.float, device=self.device, requires_grad=False) # default: lin_vel_tip_x, lin_vel_tip_y, lin_vel_tip_z, ang_vel_tip_a, ang_vel_tip_b, ang_vel_tip_c
+        self.commands_scale = torch.tensor([self.obs_scales.lin_vel, self.obs_scales.lin_vel, self.obs_scales.lin_vel, self.obs_scales.ang_vel, self.obs_scales.ang_vel, self.obs_scales.ang_vel, self.obs_scales.ang_vel], device=self.device, requires_grad=False,) # 6 dim scale vector
         
         self.last_contacts = torch.zeros(self.num_envs, len(self.feet_indices), dtype=torch.bool, device=self.device, requires_grad=False)
         self.hand_lin_vel = quat_rotate_inverse(self.base_quat, self.root_states[:, 7:10])

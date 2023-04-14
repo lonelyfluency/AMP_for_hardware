@@ -29,14 +29,14 @@
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
 import glob
 import numpy as np
-from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO
+from legged_gym.envs.base.arm_config import ArmCfg, ArmCfgPPO
 
 MOTION_FILES = glob.glob('datasets/hammer_motions/*')
 
 
-class gen3AMPCfg( LeggedRobotCfg ):
+class gen3AMPCfg( ArmCfg ):
 
-    class env( LeggedRobotCfg.env ):
+    class env( ArmCfg.env ):
         num_envs = 5480
         include_history_steps = None  # Number of steps of history to include.
         num_observations = 42
@@ -45,7 +45,7 @@ class gen3AMPCfg( LeggedRobotCfg ):
         reference_state_initialization_prob = 0.85
         amp_motion_files = MOTION_FILES
 
-    class init_state( LeggedRobotCfg.init_state ):
+    class init_state( ArmCfg.init_state ):
         pos = [0.0, 0.0, 0.44] # x,y,z [m]
         default_joint_angles = { # = target angles [rad] when action = 0.0
             'joint_1': 0,   # [rad]
@@ -57,7 +57,7 @@ class gen3AMPCfg( LeggedRobotCfg ):
             'joint_7': np.pi/2,     # [rad]
         }
 
-    class control( LeggedRobotCfg.control ):
+    class control( ArmCfg.control ):
         # PD Drive parameters:
         control_type = 'P'
         stiffness = {'joint': 80.}  # [N*m/rad]
@@ -67,11 +67,11 @@ class gen3AMPCfg( LeggedRobotCfg ):
         # decimation: Number of control action updates @ sim DT per policy DT
         decimation = 6
 
-    class terrain( LeggedRobotCfg.terrain ):
+    class terrain( ArmCfg.terrain ):
         mesh_type = 'plane'
         measure_heights = False
 
-    class asset( LeggedRobotCfg.asset ):
+    class asset( ArmCfg.asset ):
         file = '{LEGGED_GYM_ROOT_DIR}/resources/arms/kinovagen3/mjcf/kinova_hammer_isaacsim.xml'
         tip_name = "hammer"
         penalize_contacts_on = ["half_arm_1_link", "half_arm_2_link","forearm_link", "spherical_wrist_1_link","spherical_wrist_2_link", "bracelet_link"]
@@ -95,9 +95,9 @@ class gen3AMPCfg( LeggedRobotCfg ):
             gravity = 0.05
             height_measurements = 0.1
 
-    class rewards( LeggedRobotCfg.rewards ):
+    class rewards( ArmCfg.rewards ):
         soft_dof_pos_limit = 0.9
-        class scales( LeggedRobotCfg.rewards.scales ):
+        class scales( ArmCfg.rewards.scales ):
             termination = 0.0
             tracking_lin_vel = 1.5 * 1. / (.005 * 6)
             tracking_ang_vel = 0.5 * 1. / (.005 * 6)
@@ -125,15 +125,15 @@ class gen3AMPCfg( LeggedRobotCfg ):
             ang_vel_c = [-1.57, 1.57]    # min max [rad/s]
             heading = [-3.14, 3.14]
 
-class gen3AMPCfgPPO( LeggedRobotCfgPPO ):
+class gen3AMPCfgPPO( ArmCfgPPO ):
     runner_class_name = 'AMPOnPolicyRunner'
-    class algorithm( LeggedRobotCfgPPO.algorithm ):
+    class algorithm( ArmCfgPPO.algorithm ):
         entropy_coef = 0.01
         amp_replay_buffer_size = 1000000
         num_learning_epochs = 5
         num_mini_batches = 4
 
-    class runner( LeggedRobotCfgPPO.runner ):
+    class runner( ArmCfgPPO.runner ):
         run_name = ''
         experiment_name = 'gen3_amp_example'
         algorithm_class_name = 'AMPPPO'

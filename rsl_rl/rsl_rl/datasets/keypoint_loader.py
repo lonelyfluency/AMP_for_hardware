@@ -14,8 +14,8 @@ from rsl_rl.datasets import motion_util
 
 class AMPLoader:
 
-    POS_SIZE = 10
-    VEL_SIZE = 10
+    POS_SIZE = 2
+    ROT_SIZE = 1
 
 
     def __init__(
@@ -49,8 +49,22 @@ class AMPLoader:
                 motion_json = json.load(f)
                 motion_data = np.array(motion_json["Frames"])
 
+                # # Normalize and standardize quaternions.
+                # for f_i in range(motion_data.shape[0]):
+                #     root_rot = AMPLoader.get_root_rot(motion_data[f_i])
+                #     root_rot = pose3d.QuaternionNormalize(root_rot)
+                #     root_rot = motion_util.standardize_quaternion(root_rot)
+                #     motion_data[
+                #         f_i,
+                #         AMPLoader.POS_SIZE:
+                #             (AMPLoader.POS_SIZE +
+                #              AMPLoader.ROT_SIZE)] = root_rot
+                
+                # Remove first 2 observation dimensions (root_pos).
                 self.trajectories.append(torch.tensor(
-                    motion_data, dtype=torch.float32, device=device))
+                    motion_data[:, 
+                                AMPLoader.POS_SIZE:
+                                ], dtype=torch.float32, device=device))
                 self.trajectories_full.append(torch.tensor(motion_data,dtype=torch.float32, device=device))
                 self.trajectory_idxs.append(i)
                 self.trajectory_weights.append(0.5)
@@ -269,6 +283,6 @@ class AMPLoader:
         return len(self.trajectory_names)
     
 if __name__=="__main__":
-    dataloader = AMPLoader(device="cpu", time_between_frames=0.021)
+    dataloader = AMPLoader(device="cuda:0", time_between_frames=0.017)
     print(len(dataloader.trajectories_full))
     print(dataloader.trajectories)
