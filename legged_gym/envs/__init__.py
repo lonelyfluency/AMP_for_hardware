@@ -32,6 +32,7 @@ from legged_gym import LEGGED_GYM_ROOT_DIR, LEGGED_GYM_ENVS_DIR
 from legged_gym.envs.a1.a1_config import A1RoughCfg, A1RoughCfgPPO
 from legged_gym.envs.gen3.gen3_config import gen3RoughCfg, gen3RoughCfgPPO
 from .base.legged_robot import LeggedRobot
+from .base.arm import Arm
 from .a1.a1_config import A1RoughCfg, A1RoughCfgPPO
 from .a1.a1_amp_config import A1AMPCfg, A1AMPCfgPPO
 from .gen3.gen3_config import gen3RoughCfg, gen3RoughCfgPPO
@@ -40,9 +41,10 @@ from .gen3.gen3_amp_config import gen3AMPCfg, gen3AMPCfgPPO
 import os
 
 from legged_gym.utils.task_registry import task_registry
+from legged_gym.utils.task_registry_arm import task_registry_arm
 
 task_registry.register( "a1", LeggedRobot, A1RoughCfg(), A1RoughCfgPPO() )
 task_registry.register( "a1_amp", LeggedRobot, A1AMPCfg(), A1AMPCfgPPO() )
 
-task_registry.register( "gen3", LeggedRobot, gen3RoughCfg(), gen3RoughCfgPPO() )
-task_registry.register( "gen3_amp", LeggedRobot, gen3AMPCfg(), gen3AMPCfgPPO() )
+task_registry_arm.register( "gen3", Arm, gen3RoughCfg(), gen3RoughCfgPPO() )
+task_registry_arm.register( "gen3_amp", Arm, gen3AMPCfg(), gen3AMPCfgPPO() )

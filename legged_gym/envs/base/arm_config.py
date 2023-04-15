@@ -132,9 +132,6 @@ class ArmCfg(BaseConfig):
         friction_range = [0.5, 1.25]
         randomize_base_mass = False
         added_mass_range = [-1., 1.]
-        push_robots = True
-        push_interval_s = 15
-        max_push_vel_xy = 1.
         randomize_gains = False
         stiffness_multiplier_range = [0.9, 1.1]
         damping_multiplier_range = [0.9, 1.1]
@@ -157,7 +154,8 @@ class ArmCfg(BaseConfig):
         # soft_dof_pos_limit = 1. # percentage of urdf limits, values above this limit are penalized
         # soft_dof_vel_limit = 1.
         # soft_torque_limit = 1.
-        # base_height_target = 1.
+        base_height_target = 0.
+        target_pos = [0.,0.]
         # max_contact_force = 100. # forces above this value are penalized
 
     class normalization:

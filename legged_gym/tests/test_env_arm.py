@@ -34,7 +34,7 @@ from datetime import datetime
 
 import isaacgym
 from legged_gym.envs import *
-from legged_gym.utils import  get_args, export_policy_as_jit, task_registry, task_registry_arm, Logger
+from legged_gym.utils import  get_args_arm, export_policy_as_jit, task_registry_arm, Logger
 
 import torch
 
@@ -59,5 +59,6 @@ def test_env(args):
     print("Done")
 
 if __name__ == '__main__':
-    args = get_args()
+    args = get_args_arm()
+    print("args: ",args)
     test_env(args)

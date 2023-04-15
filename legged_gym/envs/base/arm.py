@@ -47,7 +47,7 @@ from legged_gym.utils.terrain import Terrain
 from legged_gym.utils.math import quat_apply_yaw, wrap_to_pi, torch_rand_sqrt_float
 from legged_gym.utils.helpers import class_to_dict
 from .arm_config import ArmCfg
-from rsl_rl.datasets.motion_loader import AMPLoader
+from rsl_rl.datasets.keypoint_loader import AMPLoader
 
 
 
@@ -218,11 +218,6 @@ class Arm(BaseTask):
 
         self._resample_commands(env_ids)
 
-        if self.cfg.domain_rand.randomize_gains:
-            new_randomized_gains = self.compute_randomized_gains(len(env_ids))
-            self.randomized_p_gains[env_ids] = new_randomized_gains[0]
-            self.randomized_d_gains[env_ids] = new_randomized_gains[1]
-
         # reset buffers
         self.last_actions[env_ids] = 0.
         self.last_dof_vel[env_ids] = 0.
@@ -384,9 +379,7 @@ class Arm(BaseTask):
         #         print(f"Mass of body {i}: {p.mass} (before randomization)")
         #     print(f"Total mass {sum} (before randomization)")
         # randomize base mass
-        if self.cfg.domain_rand.randomize_base_mass:
-            rng = self.cfg.domain_rand.added_mass_range
-            props[0].mass += np.random.uniform(rng[0], rng[1])
+
         return props
     
     def _post_physics_step_callback(self):
@@ -588,11 +581,8 @@ class Arm(BaseTask):
         noise_vec[3:6] = noise_scales.ang_vel * noise_level * self.obs_scales.ang_vel
         noise_vec[6:9] = noise_scales.gravity * noise_level
         noise_vec[9:12] = 0. # commands
-        noise_vec[12:24] = noise_scales.dof_pos * noise_level * self.obs_scales.dof_pos
-        noise_vec[24:36] = noise_scales.dof_vel * noise_level * self.obs_scales.dof_vel
-        noise_vec[36:48] = 0. # previous actions
-        if self.cfg.terrain.measure_heights:
-            noise_vec[48:235] = noise_scales.height_measurements* noise_level * self.obs_scales.height_measurements
+        noise_vec[12:19] = 0. # previous actions
+        
         return noise_vec
 
     #----------------------------------------
@@ -608,7 +598,7 @@ class Arm(BaseTask):
         self.gym.refresh_net_contact_force_tensor(self.sim)
 
         # create some wrapper tensors for different slices
-        self.root_states = gymtorch.wrap_tensor( )
+        self.root_states = gymtorch.wrap_tensor(actor_root_state)
         self.dof_state = gymtorch.wrap_tensor(dof_state_tensor)
         self.dof_pos = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 0]
         self.dof_vel = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 1]
@@ -659,8 +649,6 @@ class Arm(BaseTask):
                     print(f"PD gain of joint {name} were not defined, setting them to zero")
         self.default_dof_pos = self.default_dof_pos.unsqueeze(0)
 
-        if self.cfg.domain_rand.randomize_gains:
-            self.randomized_p_gains, self.randomized_d_gains = self.compute_randomized_gains(self.num_envs)
 
     def compute_randomized_gains(self, num_envs):
         p_mult = ((
@@ -897,7 +885,6 @@ class Arm(BaseTask):
         self.max_episode_length_s = self.cfg.env.episode_length_s
         self.max_episode_length = np.ceil(self.max_episode_length_s / self.dt)
 
-        self.cfg.domain_rand.push_interval = np.ceil(self.cfg.domain_rand.push_interval_s / self.dt)
 
     def _draw_debug_vis(self):
         """ Draws visualizations for dubugging (slows down simulation a lot).
@@ -1066,3 +1053,8 @@ class Arm(BaseTask):
     def _reward_feet_contact_forces(self):
         # penalize high contact forces
         return torch.sum((torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1) -  self.cfg.rewards.max_contact_force).clip(min=0.), dim=1)
+    
+    def _reward_reach(self):
+        # reward for reach the target
+        hammer_head_pos = torch.mean(self.root_states[:, 2].unsqueeze(1) - self.measured_heights, dim=1)
+        return torch.square(hammer_head_pos - self.cfg.rewards.base_height_target)
