@@ -1,6 +1,3 @@
-# SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: BSD-3-Clause
-# 
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
 #
@@ -140,8 +137,8 @@ class ArmCfg(BaseConfig):
         class scales:
             termination = -0.0
             reach = 2.0
-            tracking_lin_vel = 1.0
-            tracking_ang_vel = 0.5
+            # tracking_lin_vel = 1.0
+            # tracking_ang_vel = 0.5
             # lin_vel_z = -2.0
             # ang_vel_xy = -0.05
             # orientation = -0.

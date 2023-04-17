@@ -140,6 +140,8 @@ kinova_num_dofs = gym.get_asset_dof_count(kinova_asset)
 default_dof_pos = np.zeros(kinova_num_dofs, dtype=np.float32)
 default_dof_pos = kinova_mids
 
+print("kinova_num_dofs: ",kinova_num_dofs)
+
 default_dof_state = np.zeros(kinova_num_dofs, gymapi.DofState.dtype)
 default_dof_state["pos"] = default_dof_pos
 
@@ -327,6 +329,8 @@ while not gym.query_viewer_has_closed(viewer):
         print("hammer_rot: ", hammer_rot)
         print("nail_pos: ", nail_pos)
         print("nail_rot: ", nail_rot)
+        print("kinova_num_dofs: ",kinova_num_dofs)
+
 
         to_nail = nail_pos - hand_pos
         nail_dist = torch.norm(to_nail, dim=-1).unsqueeze(-1)

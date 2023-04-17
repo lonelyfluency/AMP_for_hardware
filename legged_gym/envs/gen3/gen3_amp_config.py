@@ -99,8 +99,8 @@ class gen3AMPCfg( ArmCfg ):
         soft_dof_pos_limit = 0.9
         class scales( ArmCfg.rewards.scales ):
             termination = 0.0
-            tracking_lin_vel = 1.5 * 1. / (.005 * 6)
-            tracking_ang_vel = 0.5 * 1. / (.005 * 6)
+            # tracking_lin_vel = 1.5 * 1. / (.005 * 6)
+            # tracking_ang_vel = 0.5 * 1. / (.005 * 6)
             lin_vel_z = 0.0
             ang_vel_xy = 0.0
             orientation = 0.0
