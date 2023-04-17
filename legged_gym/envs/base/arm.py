@@ -48,7 +48,7 @@ from legged_gym.utils.math import quat_apply_yaw, wrap_to_pi, torch_rand_sqrt_fl
 from legged_gym.utils.helpers import class_to_dict
 from .arm_config import ArmCfg
 from rsl_rl.datasets.keypoint_loader import AMPLoader
-
+import KinovaGen3 as gen3arm
 
 
 # COM_OFFSET = torch.tensor([0.012731, 0.002186, 0.000515])
@@ -657,40 +657,6 @@ class Arm(BaseTask):
                 if self.cfg.control.control_type in ["P", "V"]:
                     print(f"PD gain of joint {name} were not defined, setting them to zero")
         self.default_dof_pos = self.default_dof_pos.unsqueeze(0)
-
-
-    def compute_randomized_gains(self, num_envs):
-        p_mult = ((
-            self.cfg.domain_rand.stiffness_multiplier_range[0] -
-            self.cfg.domain_rand.stiffness_multiplier_range[1]) *
-            torch.rand(num_envs, self.num_actions, device=self.device) +
-            self.cfg.domain_rand.stiffness_multiplier_range[1]).float()
-        d_mult = ((
-            self.cfg.domain_rand.damping_multiplier_range[0] -
-            self.cfg.domain_rand.damping_multiplier_range[1]) *
-            torch.rand(num_envs, self.num_actions, device=self.device) +
-            self.cfg.domain_rand.damping_multiplier_range[1]).float()
-        
-        return p_mult * self.p_gains, d_mult * self.d_gains
-
-
-    def foot_position_in_hip_frame(self, angles, l_hip_sign=1):
-        theta_ab, theta_hip, theta_knee = angles[:, 0], angles[:, 1], angles[:, 2]
-        l_up = 0.2
-        l_low = 0.2
-        l_hip = 0.08505 * l_hip_sign
-        leg_distance = torch.sqrt(l_up**2 + l_low**2 +
-                                2 * l_up * l_low * torch.cos(theta_knee))
-        eff_swing = theta_hip + theta_knee / 2
-
-        off_x_hip = -leg_distance * torch.sin(eff_swing)
-        off_z_hip = -leg_distance * torch.cos(eff_swing)
-        off_y_hip = l_hip
-
-        off_x = off_x_hip
-        off_y = torch.cos(theta_ab) * off_y_hip - torch.sin(theta_ab) * off_z_hip
-        off_z = torch.sin(theta_ab) * off_y_hip + torch.cos(theta_ab) * off_z_hip
-        return torch.stack([off_x, off_y, off_z], dim=-1)
 
     def hand_positions_in_base_frame(self, foot_angles):
         foot_positions = torch.zeros_like(foot_angles)
