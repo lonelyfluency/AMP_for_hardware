@@ -430,12 +430,15 @@ class Arm(BaseTask):
         actions_scaled = actions * self.cfg.control.action_scale
         control_type = self.cfg.control.control_type
 
-        if self.cfg.domain_rand.randomize_gains:
-            p_gains = self.randomized_p_gains
-            d_gains = self.randomized_d_gains
-        else:
-            p_gains = self.p_gains
-            d_gains = self.d_gains
+        # if self.cfg.domain_rand.randomize_gains:
+        #     p_gains = self.randomized_p_gains
+        #     d_gains = self.randomized_d_gains
+        # else:
+        #     p_gains = self.p_gains
+        #     d_gains = self.d_gains
+
+        p_gains = self.p_gains
+        d_gains = self.d_gains
 
         if control_type=="P":
             torques = p_gains*(actions_scaled + self.default_dof_pos - self.dof_pos) - d_gains*self.dof_vel
