@@ -48,7 +48,7 @@ from legged_gym.utils.math import quat_apply_yaw, wrap_to_pi, torch_rand_sqrt_fl
 from legged_gym.utils.helpers import class_to_dict
 from .arm_config import ArmCfg
 from rsl_rl.datasets.keypoint_loader import AMPLoader
-import KinovaGen3 as gen3arm
+from  .KinovaGen3 import *
 
 
 # COM_OFFSET = torch.tensor([0.012731, 0.002186, 0.000515])
