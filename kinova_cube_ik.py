@@ -16,6 +16,12 @@ import torch
 import random
 import time
 
+HAND_2_HAMMERMID = torch.tensor([-0.15, 0, 0.14])
+HAND_2_HAMMERGRASP = torch.tensor([0, 0, 0.14])
+HAND_2_HAMMERHEAD = torch.tensor([-0.145, 0, 0.19])
+HAND_2_HAMMERTAIL = torch.tensor([0.09, 0, 0.14])
+HAND_2_HAMMERCLAW = torch.tensor([-0.145, 0, 0.095])
+
 
 def quat_axis(q, axis=0):
     basis_vec = torch.zeros(q.shape[0], 3, device=q.device)
@@ -100,7 +106,7 @@ table_asset = gym.create_box(sim, table_dims.x, table_dims.y, table_dims.z, asse
 # box_asset = gym.create_box(sim, box_size, box_size, box_size, asset_options)
 
 # load kinova asset
-kinova_asset_file = "mjcf/kinova_hammer_isaacsim_joint.xml"
+kinova_asset_file = "mjcf/kinova_hammer_isaacsim.xml"
 asset_options = gymapi.AssetOptions()
 asset_options.armature = 0.01
 asset_options.fix_base_link = True
@@ -147,10 +153,10 @@ default_dof_state["pos"] = default_dof_pos
 
 # get link index of endeffector hand, which we will use as end effector
 kinova_link_dict = gym.get_asset_rigid_body_dict(kinova_asset)
-kinova_hand_index = kinova_link_dict["bracelet_link"] # todo change with end effector
+kinova_hand_index = kinova_link_dict["base"] # todo change with end effector
 
 # configure env grid
-num_envs = 2
+num_envs = 1
 num_dof = 15
 num_per_row = int(math.sqrt(num_envs))
 spacing = 1.0
@@ -231,13 +237,13 @@ for i in range(num_envs):
     gym.set_actor_dof_position_targets(env, kinova_handle, default_dof_pos)
 
     # get inital hand pose
-    hand_handle = gym.find_actor_rigid_body_handle(env, kinova_handle, "bracelet_link")
+    hand_handle = gym.find_actor_rigid_body_handle(env, kinova_handle, "base")
     hand_pose = gym.get_rigid_transform(env, hand_handle)
     init_pos_list.append([hand_pose.p.x, hand_pose.p.y, hand_pose.p.z])
     init_rot_list.append([hand_pose.r.x, hand_pose.r.y, hand_pose.r.z, hand_pose.r.w])
 
     # get global index of hand in rigid body state tensor
-    hand_idx = gym.find_actor_rigid_body_index(env, kinova_handle, "bracelet_link", gymapi.DOMAIN_SIM)
+    hand_idx = gym.find_actor_rigid_body_index(env, kinova_handle, "base", gymapi.DOMAIN_SIM)
     hand_idxs.append(hand_idx)
 
     # get initial hammer pose
