@@ -28,6 +28,20 @@ def quat_axis(q, axis=0):
     basis_vec[:, axis] = 1
     return quat_rotate(q, basis_vec)
 
+def quat_2_rotM(q):
+    q = q[0]
+    w,x,y,z = q[0],q[1],q[2],q[3]
+    Rq = np.zeros((3,3),dtype=np.float64)
+    Rq[0,0] = 1 - 2*y**2 - 2*z**2
+    Rq[0,1] = 2*x*y - 2*z*w
+    Rq[0,2] = 2*x*z + 2*y*w
+    Rq[1,0] = 2*x*y + 2*z*w
+    Rq[1,1] = 1 - 2*x**2 - 2*z**2
+    Rq[1,2] = 2*y*z - 2*x*w
+    Rq[2,0] = 2*x*z - 2*y*w
+    Rq[2,1] = 2*y*z + 2*x*w
+    Rq[2,2] = 1 - 2*x**2 - 2*y**2
+    return torch.tensor(Rq,dtype=torch.double)
 
 def orientation_error(desired, current):
     cc = quat_conjugate(current)
@@ -336,6 +350,10 @@ while not gym.query_viewer_has_closed(viewer):
         print("nail_pos: ", nail_pos)
         print("nail_rot: ", nail_rot)
         print("kinova_num_dofs: ",kinova_num_dofs)
+        hand_rotationM = quat_2_rotM(hand_rot)
+        print(hand_rotationM)
+        hammer_mid = hand_pos + quat_2_rotM(hand_rot)@HAND_2_HAMMERMID
+        print("hammer_mid: ",hammer_mid)
 
 
         to_nail = nail_pos - hand_pos
@@ -413,11 +431,11 @@ while not gym.query_viewer_has_closed(viewer):
 
         contact_forces = gymtorch.wrap_tensor(net_contact_forces).view(num_envs, -1, 3) # shape: num_envs, num_bodies, xyz axis
 
-        print("root_states: ",root_states)
-        print("dof_pos_: ",dof_pos_)
-        print("dof_vel: ",dof_vel)
-        print("base_quat: ",base_quat)
-        print("contact_forces: ",contact_forces)
+        # print("root_states: ",root_states)
+        # print("dof_pos_: ",dof_pos_)
+        # print("dof_vel: ",dof_vel)
+        # print("base_quat: ",base_quat)
+        # print("contact_forces: ",contact_forces)
 
 
     elif counter == 250:
