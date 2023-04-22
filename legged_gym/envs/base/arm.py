@@ -48,7 +48,7 @@ from legged_gym.utils.math import quat_apply_yaw, wrap_to_pi, torch_rand_sqrt_fl
 from legged_gym.utils.helpers import class_to_dict
 from .arm_config import ArmCfg
 from rsl_rl.datasets.keypoint_loader import AMPLoader
-from  .KinovaGen3 import *
+from .KinovaGen3 import *
 
 
 # COM_OFFSET = torch.tensor([0.012731, 0.002186, 0.000515])
@@ -531,12 +531,6 @@ class Arm(BaseTask):
                                                      gymtorch.unwrap_tensor(self.root_states),
                                                      gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
 
-    def _push_robots(self):
-        """ Random pushes the robots. Emulates an impulse by setting a randomized base velocity. 
-        """
-        max_vel = self.cfg.domain_rand.max_push_vel_xy
-        self.root_states[:, 7:9] = torch_rand_float(-max_vel, max_vel, (self.num_envs, 2), device=self.device) # lin vel x/y
-        self.gym.set_actor_root_state_tensor(self.sim, gymtorch.unwrap_tensor(self.root_states))
 
     def _update_terrain_curriculum(self, env_ids):
         """ Implements the game-inspired curriculum.
@@ -658,13 +652,33 @@ class Arm(BaseTask):
                     print(f"PD gain of joint {name} were not defined, setting them to zero")
         self.default_dof_pos = self.default_dof_pos.unsqueeze(0)
 
-    def hand_positions_in_base_frame(self, foot_angles):
-        foot_positions = torch.zeros_like(foot_angles)
-        for i in range(4):
-            foot_positions[:, i * 3:i * 3 + 3].copy_(
-                self.foot_position_in_hip_frame(foot_angles[:, i * 3: i * 3 + 3], l_hip_sign=(-1)**(i)))
-        
-        return foot_positions
+    def _is_rotation_matrix(self,R):
+        Rt = np.transpose(R)
+        should_be_identity = np.dot(Rt,R)
+        I = np.identity(3, dtype=R.dtype)
+        n = np.linalg.norm(I - should_be_identity)
+        return n < 1e-6
+    
+    def _rotation_matrix_2_eular_angles(self,R):
+        assert(self._is_rotation_matrix(R))
+        sy = np.sqrt(R[0,0]*R[0,0]+R[1,0]*R[1,0])
+        singular = sy<1e-6
+        if not singular:
+            x = np.arctan2(R[2,1],R[2,2])
+            y = np.arctan2(-R[2,0],sy)
+            z = np.arctan2(R[1,0],R[0,0])
+        else:
+            x = np.arctan2(-R[1,2],R[1,1])
+            y = np.arctan2(-R[2,0],sy)
+            z = 0
+        return np.array([x,y,z])
+
+    def hand_positions_in_base_frame(self, dof_angles):
+        hand_positions = forward_kinematics(dof_angles)
+        hand_pos = hand_positions[0]
+        hand_R = hand_positions[1]
+        hand_eular = self._rotation_matrix_2_eular_angles(hand_R)
+        return np.array([hand_pos, hand_eular])
 
     def _prepare_reward_function(self):
         """ Prepares a list of reward functions, whcih will be called to compute the total reward.

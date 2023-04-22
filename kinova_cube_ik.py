@@ -131,9 +131,20 @@ kinova_ranges = kinova_upper_limits - kinova_lower_limits
 kinova_mids = [0.0, -1.0, 0.0, +2.6, -1.57, 0.0,0,0,0,0,0,0,0,0,0]
 
 # use position drive for all dofs
-kinova_dof_props["driveMode"].fill(gymapi.DOF_MODE_POS)
+print("before")
+print("stiffness ",kinova_dof_props["stiffness"])
+print("damping ",kinova_dof_props["damping"])
+print("driveMode ",kinova_dof_props["driveMode"])
+
+kinova_dof_props["driveMode"][:7].fill(gymapi.DOF_MODE_POS)
+kinova_dof_props["driveMode"][7:].fill(gymapi.DOF_MODE_NONE)
 kinova_dof_props["stiffness"][:].fill(400.0)
 kinova_dof_props["damping"][:].fill(40.0)
+
+print("after")
+print("stiffness ",kinova_dof_props["stiffness"])
+print("damping ",kinova_dof_props["damping"])
+print("driveMode ",kinova_dof_props["driveMode"])
 
 # default dof states and position targets
 kinova_num_dofs = gym.get_asset_dof_count(kinova_asset)
@@ -295,9 +306,13 @@ rb_states = gymtorch.wrap_tensor(_rb_states)
 _dof_states = gym.acquire_dof_state_tensor(sim)
 dof_states = gymtorch.wrap_tensor(_dof_states)
 dof_pos = dof_states[:, 0].view(num_envs, 15, 1)
+dof_vel = dof_states[:,1].view(num_envs,15,1)
+print("dof_pos",dof_pos)
+print("dof_vel",dof_vel)
 
 # Create a tensor noting whether the hand should return to the initial position
 hand_restart = torch.full([num_envs], False, dtype=torch.bool).to(device)
+
 
 counter = 0
 # simulation loop
@@ -311,8 +326,32 @@ while not gym.query_viewer_has_closed(viewer):
     gym.refresh_rigid_body_state_tensor(sim)
     gym.refresh_dof_state_tensor(sim)
     gym.refresh_jacobian_tensors(sim)
+
+
+    # # get gym GPU state tensors
+    # actor_root_state = gym.acquire_actor_root_state_tensor(sim)
+    # dof_state_tensor = gym.acquire_dof_state_tensor(sim)
+    # net_contact_forces = gym.acquire_net_contact_force_tensor(sim)
+    # gym.refresh_dof_state_tensor(sim)
+    # gym.refresh_actor_root_state_tensor(sim)
+    # gym.refresh_net_contact_force_tensor(sim)
+
+    # # create some wrapper tensors for different slices
+    # root_states = gymtorch.wrap_tensor(actor_root_state)
+    # dof_state = gymtorch.wrap_tensor(dof_state_tensor)
+    # dof_pos = dof_state.view(num_envs, num_dof, 2)[..., 0]
+    # dof_vel = dof_state.view(num_envs, num_dof, 2)[..., 1]
+    # base_quat = root_states[:, 3:7]
+
+    # contact_forces = gymtorch.wrap_tensor(net_contact_forces).view(num_envs, -1, 3) # shape: num_envs, num_bodies, xyz axis
+
+    # print("root_states",root_states)
+    # print("dof_state",dof_state)
+    # print("dof_pos",dof_pos)
+    # print("dof_vel",dof_vel)
+    # print("base_quat",base_quat)
     
-    if counter==50:
+    if counter==200:
         counter=0
         nail_pos = rb_states[nail_idxs, :3]
         nail_rot = rb_states[nail_idxs, 3:7]

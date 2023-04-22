@@ -94,6 +94,27 @@ class TestArm:
             beta = math.asin(-2 * (x*z - w*y))
             gamma = math.atan2(2 * (x*y + w*z), w*w + x*x - y*y - z*z)
         return alpha,beta,gamma
+    
+    def _is_rotation_matrix(self,R):
+        Rt = np.transpose(R)
+        should_be_identity = np.dot(Rt,R)
+        I = np.identity(3, dtype=R.dtype)
+        n = np.linalg.norm(I - should_be_identity)
+        return n < 1e-6
+    
+    def _rotation_matrix_2_eular_angles(self,R):
+        assert(self._is_rotation_matrix(R))
+        sy = np.sqrt(R[0,0]*R[0,0]+R[1,0]*R[1,0])
+        singular = sy<1e-6
+        if not singular:
+            x = np.arctan2(R[2,1],R[2,2])
+            y = np.arctan2(-R[2,0],sy)
+            z = np.arctan2(R[1,0],R[0,0])
+        else:
+            x = np.arctan2(-R[1,2],R[1,1])
+            y = np.arctan2(-R[2,0],sy)
+            z = 0
+        return np.array([x,y,z])
 
     def simulate(self):
         home_angles_arm = [0, 0.4, np.pi, -np.pi+1.4, 0, -1, np.pi/2]
@@ -104,7 +125,9 @@ class TestArm:
         hand_quat = self.get_sensor_hand_quat()
         print("sensor hand quat: ", hand_quat)
         print("sensor hand euler: ", self.quaternion_2_euler(hand_quat))
-        print("fk end effector position: ", KinovaGen3.forward_kinematics(self.get_dof_pos()))
+        fk_end_effector_pos = KinovaGen3.forward_kinematics(self.get_dof_pos())
+        print("fk end effector position: ", fk_end_effector_pos[0])
+        print("fk end effector position eular: ", self._rotation_matrix_2_eular_angles(fk_end_effector_pos[1]))
 
 if __name__ == "__main__":
     gen3 = TestArm()
