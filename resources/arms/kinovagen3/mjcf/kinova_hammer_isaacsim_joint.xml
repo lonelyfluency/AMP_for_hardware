@@ -92,6 +92,15 @@
             </default>
         </default>
       </default>
+
+        <default class="hammer">
+            <mesh scale="0.001 0.001 0.001"/>
+            <general biastype="affine"/>
+
+            <default class="hammer_site">
+                <site size="0.005 0.005 0.005" type="sphere" rgba="1 0 0 1" group="2"/>
+            </default>
+        </default>
     </default>
 
     <worldbody>
@@ -227,18 +236,25 @@
                                                 </body>
                                                 </body>
                                                 <!-- hammer -->
-                                                <!-- <body name="hammer" pos="0.08 0.052 0.155" quat="0 0.707 -0.707 0"> -->
-                                                <body name="hammer" pos="0.1 -0.0155 0.191" quat="-0.50 0.5 -0.5 -0.5">
+                                                <site name="tail" pos="0.09 0 0.14" size="0.005 0.005 0.005" type="box" rgba="0 0 1 0.3" group="1"/>
+                                                <site name="mid" pos="-0.15 0 0.14" size="0.005 0.005 0.005" type="box" rgba="0 0 1 0.3" group="1"/>
+                                                <site name="head" pos="-0.145 0 0.19" size="0.005 0.005 0.005" type="box" rgba="0 0 1 0.3" group="1"/>
+                                                <site name="claw" pos="-0.145 0 0.095" size="0.005 0.005 0.005" type="box" rgba="0 0 1 0.3" group="1"/>
+                                                
+                                                <body name="hammer" pos="0.095 -0.0155 0.191" quat="-0.50 0.5 -0.5 -0.5">
                                                     <geom class="visual" density="7850" friction="0.7" solimp="0.95 0.99 0.001" solref="0.004 1" priority="1" rgba="0.58 0.58 0.58 1" mesh="hammer_handle" />
                                                     <geom class="collision" mesh="hammer_handle"/>
                                                     <geom class="visual" density="7850" friction="0.7" solimp="0.95 0.99 0.001" solref="0.004 1" priority="1" rgba="0.58 0.58 0.58 1" mesh="hammer_head_front" />
                                                     <geom class="collision" mesh="hammer_head_front"/>
-                                                    <site name="hammer_head" pos="0 0 0" size="0.015 0.015 0.015" type="sphere" rgba="1 1 1 0.1"/>
-                                                    <site name="hammer_tip" pos="0 0 0" size="0.005 0.005 0.005" type="sphere" rgba="1 1 1 0.1"/>
                                                     <geom class="visual" density="7850" friction="0.7" solimp="0.95 0.99 0.001" solref="0.004 1" priority="1" rgba="0.58 0.58 0.58 1" mesh="hammer_head_left" />
                                                     <geom class="collision" mesh="hammer_head_left"/>
                                                     <geom class="visual" density="7850" friction="0.7" solimp="0.95 0.99 0.001" solref="0.004 1" priority="1" rgba="0.58 0.58 0.58 1" mesh="hammer_head_right" />
                                                     <geom class="collision" mesh="hammer_head_right"/>
+                                                    <site name="hammer_grasp" pos="0.051 0.095 0.0155 " class="hammer_site"/>
+                                                    <site name="hammer_tail" pos="0.051 0.005 0.0155" class="hammer_site"/>
+                                                    <site name="hammer_mid" pos="0.051 0.245 0.0155" class="hammer_site"/>
+                                                    <site name="hammer_head" pos="0.001 0.24 0.0155" class="hammer_site"/>
+                                                    <site name="hammer_claw" pos="0.096 0.24 0.0155" class="hammer_site"/>
                                                 </body>
                                             </body>
                                         </body>
