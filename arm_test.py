@@ -16,6 +16,8 @@ import torch
 import random
 import time
 
+from legged_gym.envs.base.KinovaGen3 import *
+
 # set random seed
 np.random.seed(42)
 
@@ -263,6 +265,8 @@ for i in range(num_envs):
     hammer_idxs.append(hammer_idx)
 
 
+
+
 # point camera at middle env
 cam_pos = gymapi.Vec3(4, 3, 2)
 cam_target = gymapi.Vec3(-4, -3, 0)
@@ -359,6 +363,23 @@ while not gym.query_viewer_has_closed(viewer):
         print("hammer_claw: ",hammer_claw)
         hammer_grasp = hand_pos.view(3,1) + quat_2_rotM(hand_rot).view(3,3).to(torch.float32).to(device) @ HAND_2_HAMMERGRASP.view(3,1).to(torch.float32).to(device)
         print("hammer_grasp: ",hammer_grasp)
+
+        target_pos = [0.5,0.5,1]
+        target_vel = [0.1,0.1,0.2,0,0,0]
+
+        _current_q = gym.acquire_dof_state_tensor(sim)
+        current_qp = gymtorch.wrap_tensor(_current_q)[:7,0].cpu().numpy()
+        current_qv = gymtorch.wrap_tensor(_current_q)[:7,1].cpu().numpy()
+        print("current_qp: ",current_qp)
+        print("current_qv: ",current_qv)
+
+        jv_ = np.array([0.0]*15)
+        jv = multicriteria_ik_damped(current_qp,target_vel)
+        jv_[:7] = jv
+        jv_ = torch.tensor(jv_).view(num_envs, 15, 1)
+        print(jv_)
+        gym.set_dof_velocity_target_tensor(kinova_handle,jv_)
+
 
     elif counter == 250:
          gym.set_dof_position_target_tensor(sim, gymtorch.unwrap_tensor(torch.cat([init_pos, init_rot], -1).unsqueeze(-1)))
