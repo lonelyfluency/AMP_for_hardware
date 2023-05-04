@@ -16,12 +16,20 @@ class AMPLoader:
 
     POS_SIZE = 10
     VEL_SIZE = 10
+    HAND_ROT_SIZE = 1
+    HAND_ANGULAR_SIZE = 1
 
     POS_START_IDX = 0
     POS_END_IDX = POS_START_IDX + POS_SIZE
 
     VEL_START_IDX = POS_END_IDX
     VEL_END_IDX = VEL_START_IDX + VEL_SIZE
+
+    HAND_ROT_START_IDX = VEL_END_IDX
+    HAND_ROT_END_IDX = HAND_ROT_START_IDX + HAND_ROT_SIZE
+
+    HAND_ANGULAR_START_IDX = HAND_ROT_END_IDX
+    HAND_ANGULAR_END_IDX = HAND_ANGULAR_START_IDX + HAND_ANGULAR_SIZE
 
 
     def __init__(
@@ -268,16 +276,9 @@ class AMPLoader:
     def get_hand_vel_batch(poses):
         return poses[:,AMPLoader.VEL_START_IDX:AMPLoader.VEL_START_IDX+2]
     def get_hand_rot_batch(poses):
-        fp = poses[:,AMPLoader.POS_START_IDX:AMPLoader.POS_START_IDX+2]
-        sp = poses[:,AMPLoader.POS_START_IDX+2:AMPLoader.POS_START_IDX+4]
-        tmp = sp-fp
-        rot = torch.atan2(tmp[:,1],tmp[:,0])
-        return rot
+        return poses[:,AMPLoader.HAND_ROT_START_IDX:AMPLoader.HAND_ROT_END_IDX]
     def get_hand_angular_batch(poses):
-        rot0 = AMPLoader.get_hand_rot_batch(poses)
-        rot1 = rot0.clone()
-        rot1[1:]=rot0[:len(rot0)-1]
-        return (rot0-rot1)
+        return poses[:,AMPLoader.HAND_ANGULAR_START_IDX:AMPLoader.HAND_ANGULAR_END_IDX]
 
 
     
@@ -287,5 +288,5 @@ if __name__=="__main__":
     print(dataloader.trajectories_full[0])
     # print(dataloader.get_frame_at_time(0,1))
     print(AMPLoader.get_hand_rot_batch(dataloader.trajectories_full[0]))
-    print(AMPLoader.get_hand_ang_batch(dataloader.trajectories_full[0]))
+    print(AMPLoader.get_hand_angular_batch(dataloader.trajectories_full[0]))
 

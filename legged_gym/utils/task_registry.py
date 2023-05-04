@@ -107,7 +107,11 @@ class TaskRegistry():
 
         Args:
             env (isaacgym.VecTaskPython): The environment to train (TODO: remove from within the algorithm)
-            name (string, optional): Name of a registered env. If None, the config file will be used instead. Defaults to None.
+            name (string, optional): Name of a regist
+            
+            
+            
+            ered env. If None, the config file will be used instead. Defaults to None.
             args (Args, optional): Isaac Gym comand line arguments. If None get_args() will be called. Defaults to None.
             train_cfg (Dict, optional): Training config file. If None 'name' will be used to get the config file. Defaults to None.
             log_root (str, optional): Logging directory for Tensorboard. Set to 'None' to avoid logging (at test time for example). 
