@@ -285,12 +285,13 @@ class Arm(BaseTask):
 
     def get_amp_observations(self):
         joint_pos = self.dof_pos
-        hand_pos = self.hand_positions_in_base_frame(self.dof_pos).to(self.device)
-        base_lin_vel = self.base_lin_vel
-        base_ang_vel = self.base_ang_vel
+        hand_pos = torch.tensor(self.hand_positions_in_base_frame(self.dof_pos)).to(self.device)
+        # base_lin_vel = self.base_lin_vel
+        # base_ang_vel = self.base_ang_vel
         joint_vel = self.dof_vel
         z_pos = self.root_states[:, 2:3]
-        return torch.cat((joint_pos, hand_pos, base_lin_vel, base_ang_vel, joint_vel, z_pos), dim=-1)
+        # return torch.cat((joint_pos, hand_pos, base_lin_vel, base_ang_vel, joint_vel, z_pos), dim=-1)
+        return torch.cat((joint_pos, hand_pos, joint_vel, z_pos), dim=-1)
 
     def create_sim(self):
         """ Creates simulation, terrain and evironments
@@ -367,8 +368,8 @@ class Arm(BaseTask):
                 # soft limits
                 m = (self.dof_pos_limits[i, 0] + self.dof_pos_limits[i, 1]) / 2
                 r = self.dof_pos_limits[i, 1] - self.dof_pos_limits[i, 0]
-                self.dof_pos_limits[i, 0] = m - 0.5 * r * self.cfg.rewards.soft_dof_pos_limit
-                self.dof_pos_limits[i, 1] = m + 0.5 * r * self.cfg.rewards.soft_dof_pos_limit
+                # self.dof_pos_limits[i, 0] = m - 0.5 * r * self.cfg.rewards.soft_dof_pos_limit
+                # self.dof_pos_limits[i, 1] = m + 0.5 * r * self.cfg.rewards.soft_dof_pos_limit
         return props
 
     def _process_rigid_body_props(self, props, env_id):
@@ -481,8 +482,8 @@ class Arm(BaseTask):
             env_ids (List[int]): Environemnt ids
             frames: AMP frames to initialize motion with
         """
-        self.dof_pos[env_ids] = AMPLoader.get_joint_pose_batch(frames)
-        self.dof_vel[env_ids] = AMPLoader.get_joint_vel_batch(frames)
+        self.dof_pos[env_ids] = AMPLoader.get_pos_batch(frames)
+        self.dof_vel[env_ids] = AMPLoader.get_vel_batch(frames)
         env_ids_int32 = env_ids.to(dtype=torch.int32)
         self.gym.set_dof_state_tensor_indexed(self.sim,
                                               gymtorch.unwrap_tensor(self.dof_state),
@@ -518,12 +519,12 @@ class Arm(BaseTask):
             env_ids (List[int]): Environemnt ids
         """
         # base position
-        root_pos = AMPLoader.get_root_pos_batch(frames)
+        root_pos = AMPLoader.get_hand_pos_batch(frames)
         root_pos[:, :2] = root_pos[:, :2] + self.env_origins[env_ids, :2]
         self.root_states[env_ids, :3] = root_pos
-        root_orn = AMPLoader.get_root_rot_batch(frames)
+        root_orn = AMPLoader.get_hand_rot_batch(frames)
         self.root_states[env_ids, 3:7] = root_orn
-        self.root_states[env_ids, 7:10] = quat_rotate(root_orn, AMPLoader.get_linear_vel_batch(frames))
+        self.root_states[env_ids, 7:10] = quat_rotate(root_orn, AMPLoader.get_hand_vel_batch(frames))
         self.root_states[env_ids, 10:13] = quat_rotate(root_orn, AMPLoader.get_angular_vel_batch(frames))
 
         env_ids_int32 = env_ids.to(dtype=torch.int32)
@@ -674,11 +675,15 @@ class Arm(BaseTask):
         return np.array([x,y,z])
 
     def hand_positions_in_base_frame(self, dof_angles):
-        hand_positions = forward_kinematics(dof_angles)
-        hand_pos = hand_positions[0]
-        hand_R = hand_positions[1]
-        hand_eular = self._rotation_matrix_2_eular_angles(hand_R)
-        return np.array([hand_pos, hand_eular])
+        res = []
+        dof_ang = dof_angles.cpu()
+        for i in range(self.num_envs):
+            hand_positions = forward_kinematics(dof_ang[i])
+            hand_pos = hand_positions[0]
+            hand_R = hand_positions[1]
+            hand_eular = self._rotation_matrix_2_eular_angles(hand_R)
+            res.append([hand_pos, hand_eular])
+        return np.array(res)
 
     def _prepare_reward_function(self):
         """ Prepares a list of reward functions, whcih will be called to compute the total reward.
@@ -688,7 +693,7 @@ class Arm(BaseTask):
         for key in list(self.reward_scales.keys()):
             scale = self.reward_scales[key]
             if scale==0:
-                self.reward_scales.pop(key) 
+                self.reward_scales.pop(key)
             else:
                 self.reward_scales[key] *= self.dt
         # prepare list of functions

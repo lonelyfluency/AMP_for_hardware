@@ -33,7 +33,7 @@ class ArmCfg(BaseConfig):
         num_envs = 4096
         num_observations = 235
         num_privileged_obs = None # if not None a priviledge_obs_buf will be returned by step() (critic obs for assymetric training). None is returned otherwise 
-        num_actions = 7
+        num_actions = 15
         env_spacing = 3.  # not used with heightfields/trimeshes 
         send_timeouts = True # send time out information to the algorithm
         episode_length_s = 20 # episode length in seconds
@@ -91,6 +91,14 @@ class ArmCfg(BaseConfig):
             'joint_5': 0,     # [rad]
             'joint_6': -1.,   # [rad]
             'joint_7': np.pi/2,     # [rad]
+            'right_driver_joint': 0.601,   # [rad]
+            'right_coupler_joint': 0,   # [rad]
+            'right_spring_link_joint': 0.585,  # [rad]
+            'right_follower_joint': -0.585,   # [rad]
+            'left_driver_joint': 0.601,   # [rad]
+            'left_coupler_joint': 0,   # [rad]
+            'left_spring_link_joint': 0.595,  # [rad]
+            'left_follower_joint': -0.595,   # [rad]
         }
 
     class control:

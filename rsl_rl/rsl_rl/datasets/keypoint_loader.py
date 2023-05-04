@@ -263,8 +263,29 @@ class AMPLoader:
         return pose[AMPLoader.VEL_START_IDX:AMPLoader.VEL_END_IDX]
     def get_vel_batch(poses):
         return poses[:,AMPLoader.VEL_START_IDX:AMPLoader.VEL_END_IDX]
+    def get_hand_pos_batch(poses):
+        return poses[:,AMPLoader.POS_START_IDX:AMPLoader.POS_START_IDX+2]
+    def get_hand_vel_batch(poses):
+        return poses[:,AMPLoader.VEL_START_IDX:AMPLoader.VEL_START_IDX+2]
+    def get_hand_rot_batch(poses):
+        fp = poses[:,AMPLoader.POS_START_IDX:AMPLoader.POS_START_IDX+2]
+        sp = poses[:,AMPLoader.POS_START_IDX+2:AMPLoader.POS_START_IDX+4]
+        tmp = sp-fp
+        rot = torch.atan2(tmp[:,1],tmp[:,0])
+        return rot
+    def get_hand_angular_batch(poses):
+        rot0 = AMPLoader.get_hand_rot_batch(poses)
+        rot1 = rot0.clone()
+        rot1[1:]=rot0[:len(rot0)-1]
+        return (rot0-rot1)
+
+
     
 if __name__=="__main__":
     dataloader = AMPLoader(device="cuda:0", time_between_frames=0.017)
-    print(len(dataloader.trajectories_full))
-    print(dataloader.get_frame_at_time(0,1))
+    
+    print(dataloader.trajectories_full[0])
+    # print(dataloader.get_frame_at_time(0,1))
+    print(AMPLoader.get_hand_rot_batch(dataloader.trajectories_full[0]))
+    print(AMPLoader.get_hand_ang_batch(dataloader.trajectories_full[0]))
+
