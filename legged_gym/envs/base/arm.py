@@ -157,9 +157,9 @@ class Arm(BaseTask):
         self.common_step_counter += 1
 
         # prepare quantities
-        self.base_quat[:] = self.root_states[:, 3:7]
-        # self.base_lin_vel[:] = quat_rotate_inverse(self.base_quat, self.root_states[:, 7:10])
-        # self.base_ang_vel[:] = quat_rotate_inverse(self.base_quat, self.root_states[:, 10:13])
+        self.base_quat[:] = self.hand_states[:, 3:7]
+        # self.base_lin_vel[:] = quat_rotate_inverse(self.base_quat, self.hand_states[:, 7:10])
+        # self.base_ang_vel[:] = quat_rotate_inverse(self.base_quat, self.hand_states[:, 10:13])
         self.projected_gravity[:] = quat_rotate_inverse(self.base_quat, self.gravity_vec)
 
         self._post_physics_step_callback()
@@ -174,7 +174,7 @@ class Arm(BaseTask):
 
         self.last_actions[:] = self.actions[:]
         self.last_dof_vel[:] = self.dof_vel[:]
-        self.last_root_vel[:] = self.root_states[:, 7:13]
+        self.last_root_vel[:] = self.hand_states[:, 7:13]
 
         if self.viewer and self.enable_viewer_sync and self.debug_viz:
             self._draw_debug_vis()
@@ -190,7 +190,7 @@ class Arm(BaseTask):
 
     def reset_idx(self, env_ids):
         """ Reset some environments.
-            Calls self._reset_dofs(env_ids), self._reset_root_states(env_ids), and self._resample_commands(env_ids)
+            Calls self._reset_dofs(env_ids), self._reset_hand_states(env_ids), and self._resample_commands(env_ids)
             [Optional] calls self._update_terrain_curriculum(env_ids), self.update_command_curriculum(env_ids) and
             Logs episode info
             Resets some buffers
@@ -211,10 +211,10 @@ class Arm(BaseTask):
         if self.cfg.env.reference_state_initialization:
             frames = self.amp_loader.get_full_frame_batch(len(env_ids))
             self._reset_dofs_amp(env_ids, frames)
-            self._reset_root_states_amp(env_ids, frames)
+            self._reset_hand_states_amp(env_ids, frames)
         else:
             self._reset_dofs(env_ids)
-            self._reset_root_states(env_ids)
+            self._reset_hand_states(env_ids)
 
         self._resample_commands(env_ids)
 
@@ -270,7 +270,7 @@ class Arm(BaseTask):
                                     ),dim=-1)
         # add perceptive inputs if not blind
         if self.cfg.terrain.measure_heights:
-            heights = torch.clip(self.root_states[:, 2].unsqueeze(1) - 0.5 - self.measured_heights, -1, 1.) * self.obs_scales.height_measurements
+            heights = torch.clip(self.hand_states[:, 2].unsqueeze(1) - 0.5 - self.measured_heights, -1, 1.) * self.obs_scales.height_measurements
             self.privileged_obs_buf = torch.cat((self.privileged_obs_buf, heights), dim=-1)
 
         # add noise if needed
@@ -289,7 +289,11 @@ class Arm(BaseTask):
         # base_lin_vel = self.base_lin_vel
         # base_ang_vel = self.base_ang_vel
         joint_vel = self.dof_vel
-        z_pos = self.root_states[:, 2:3]
+        z_pos = self.hand_states[:, 2:3]
+        print("joint_pos.shape ", joint_pos.shape)
+        print("hand_pos.shape ", hand_pos.shape)
+        print("joint_vel.shape ", joint_vel.shape)
+        print("z_pos.shape ", z_pos.shape)
         # return torch.cat((joint_pos, hand_pos, base_lin_vel, base_ang_vel, joint_vel, z_pos), dim=-1)
         return torch.cat((joint_pos, hand_pos, joint_vel, z_pos), dim=-1)
 
@@ -489,7 +493,7 @@ class Arm(BaseTask):
                                               gymtorch.unwrap_tensor(self.dof_state),
                                               gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
 
-    def _reset_root_states(self, env_ids):
+    def _reset_hand_states(self, env_ids):
         """ Resets ROOT states position and velocities of selected environmments
             Sets base position based on the curriculum
             Selects randomized base velocities within -0.5:0.5 [m/s, rad/s]
@@ -498,20 +502,20 @@ class Arm(BaseTask):
         """
         # base position
         if self.custom_origins:
-            self.root_states[env_ids] = self.base_init_state
-            self.root_states[env_ids, :3] += self.env_origins[env_ids]
-            self.root_states[env_ids, :2] += torch_rand_float(-1., 1., (len(env_ids), 2), device=self.device) # xy position within 1m of the center
+            self.hand_states[env_ids] = self.base_init_state
+            self.hand_states[env_ids, :3] += self.env_origins[env_ids]
+            self.hand_states[env_ids, :2] += torch_rand_float(-1., 1., (len(env_ids), 2), device=self.device) # xy position within 1m of the center
         else:
-            self.root_states[env_ids] = self.base_init_state
-            self.root_states[env_ids, :3] += self.env_origins[env_ids]
+            self.hand_states[env_ids] = self.base_init_state
+            self.hand_states[env_ids, :3] += self.env_origins[env_ids]
         # base velocities
-        self.root_states[env_ids, 7:13] = torch_rand_float(-0.5, 0.5, (len(env_ids), 6), device=self.device) # [7:10]: lin vel, [10:13]: ang vel
+        self.hand_states[env_ids, 7:13] = torch_rand_float(-0.5, 0.5, (len(env_ids), 6), device=self.device) # [7:10]: lin vel, [10:13]: ang vel
         env_ids_int32 = env_ids.to(dtype=torch.int32)
         self.gym.set_actor_root_state_tensor_indexed(self.sim,
-                                                     gymtorch.unwrap_tensor(self.root_states),
+                                                     gymtorch.unwrap_tensor(self.hand_states),
                                                      gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
 
-    def _reset_root_states_amp(self, env_ids, frames):
+    def _reset_hand_states_amp(self, env_ids, frames):
         """ Resets ROOT states position and velocities of selected environmments
             Sets base position based on the curriculum
             Selects randomized base velocities within -0.5:0.5 [m/s, rad/s]
@@ -519,17 +523,17 @@ class Arm(BaseTask):
             env_ids (List[int]): Environemnt ids
         """
         # base position
-        root_pos = AMPLoader.get_hand_pos_batch(frames)
-        root_pos[:, :2] = root_pos[:, :2] + self.env_origins[env_ids, :2]
-        self.root_states[env_ids, :3] = root_pos
-        root_orn = AMPLoader.get_hand_rot_batch(frames)
-        self.root_states[env_ids, 3:7] = root_orn
-        self.root_states[env_ids, 7:10] = quat_rotate(root_orn, AMPLoader.get_hand_vel_batch(frames))
-        self.root_states[env_ids, 10:13] = quat_rotate(root_orn, AMPLoader.get_angular_vel_batch(frames))
+        hand_pos = AMPLoader.get_hand_pos_batch(frames)
+        hand_pos[:, :2] = hand_pos[:, :2] + self.env_origins[env_ids, :2]
+        self.hand_states[env_ids, :2] = hand_pos
+        hand_orn = AMPLoader.get_hand_rot_batch(frames)
+        self.hand_states[env_ids, 3:4] = hand_orn
+        self.hand_states[env_ids, 4:6] = AMPLoader.get_hand_vel_batch(frames)
+        self.hand_states[env_ids, 6:7] = AMPLoader.get_hand_angular_batch(frames)
 
         env_ids_int32 = env_ids.to(dtype=torch.int32)
         self.gym.set_actor_root_state_tensor_indexed(self.sim,
-                                                     gymtorch.unwrap_tensor(self.root_states),
+                                                     gymtorch.unwrap_tensor(self.hand_states),
                                                      gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
 
 
@@ -543,7 +547,7 @@ class Arm(BaseTask):
         if not self.init_done:
             # don't change on initial reset
             return
-        distance = torch.norm(self.root_states[env_ids, :2] - self.env_origins[env_ids, :2], dim=1)
+        distance = torch.norm(self.hand_states[env_ids, :2] - self.env_origins[env_ids, :2], dim=1)
         # robots that walked far enough progress to harder terains
         move_up = distance > self.terrain.env_length / 2
         # robots that walked less than half of their required distance go to simpler terrains
@@ -602,11 +606,11 @@ class Arm(BaseTask):
         self.gym.refresh_net_contact_force_tensor(self.sim)
 
         # create some wrapper tensors for different slices
-        self.root_states = gymtorch.wrap_tensor(actor_root_state)
+        self.hand_states = gymtorch.wrap_tensor(actor_root_state)
         self.dof_state = gymtorch.wrap_tensor(dof_state_tensor)
         self.dof_pos = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 0]
         self.dof_vel = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 1]
-        self.base_quat = self.root_states[:, 3:7]
+        self.base_quat = self.hand_states[:, 3:7]
 
         self.contact_forces = gymtorch.wrap_tensor(net_contact_forces).view(self.num_envs, -1, 3) # shape: num_envs, num_bodies, xyz axis
 
@@ -622,13 +626,13 @@ class Arm(BaseTask):
         self.actions = torch.zeros(self.num_envs, self.num_actions, dtype=torch.float, device=self.device, requires_grad=False)
         self.last_actions = torch.zeros(self.num_envs, self.num_actions, dtype=torch.float, device=self.device, requires_grad=False)
         self.last_dof_vel = torch.zeros_like(self.dof_vel)
-        self.last_hand_vel = torch.zeros_like(self.root_states[:, 7:13])
+        self.last_hand_vel = torch.zeros_like(self.hand_states[:, 7:13])
         self.commands = torch.zeros(self.num_envs, self.cfg.commands.num_commands, dtype=torch.float, device=self.device, requires_grad=False) # default: lin_vel_tip_x, lin_vel_tip_y, lin_vel_tip_z, ang_vel_tip_a, ang_vel_tip_b, ang_vel_tip_c
         self.commands_scale = torch.tensor([self.obs_scales.lin_vel, self.obs_scales.lin_vel, self.obs_scales.lin_vel, self.obs_scales.ang_vel, self.obs_scales.ang_vel, self.obs_scales.ang_vel, self.obs_scales.ang_vel], device=self.device, requires_grad=False,) # 6 dim scale vector
         
         self.last_contacts = torch.zeros(self.num_envs, len(self.feet_indices), dtype=torch.bool, device=self.device, requires_grad=False)
-        self.hand_lin_vel = quat_rotate_inverse(self.base_quat, self.root_states[:, 7:10])
-        self.hand_ang_vel = quat_rotate_inverse(self.base_quat, self.root_states[:, 10:13])
+        self.hand_lin_vel = quat_rotate_inverse(self.base_quat, self.hand_states[:, 7:10])
+        self.hand_ang_vel = quat_rotate_inverse(self.base_quat, self.hand_states[:, 10:13])
         self.projected_gravity = quat_rotate_inverse(self.base_quat, self.gravity_vec)
         if self.cfg.terrain.measure_heights:
             self.height_points = self._init_height_points()
@@ -682,7 +686,7 @@ class Arm(BaseTask):
             hand_pos = hand_positions[0]
             hand_R = hand_positions[1]
             hand_eular = self._rotation_matrix_2_eular_angles(hand_R)
-            res.append([hand_pos, hand_eular])
+            res.append(np.concatenate((hand_pos, hand_eular),axis=-1))
         return np.array(res)
 
     def _prepare_reward_function(self):
@@ -891,7 +895,7 @@ class Arm(BaseTask):
         self.gym.refresh_rigid_body_state_tensor(self.sim)
         sphere_geom = gymutil.WireframeSphereGeometry(0.02, 4, 4, None, color=(1, 1, 0))
         for i in range(self.num_envs):
-            base_pos = (self.root_states[i, :3]).cpu().numpy()
+            base_pos = (self.hand_states[i, :3]).cpu().numpy()
             heights = self.measured_heights[i].cpu().numpy()
             height_points = quat_apply_yaw(self.base_quat[i].repeat(heights.shape[0]), self.height_points[i]).cpu().numpy()
             for j in range(heights.shape[0]):
@@ -936,9 +940,9 @@ class Arm(BaseTask):
             raise NameError("Can't measure height with terrain mesh type 'none'")
 
         if env_ids:
-            points = quat_apply_yaw(self.base_quat[env_ids].repeat(1, self.num_height_points), self.height_points[env_ids]) + (self.root_states[env_ids, :3]).unsqueeze(1)
+            points = quat_apply_yaw(self.base_quat[env_ids].repeat(1, self.num_height_points), self.height_points[env_ids]) + (self.hand_states[env_ids, :3]).unsqueeze(1)
         else:
-            points = quat_apply_yaw(self.base_quat.repeat(1, self.num_height_points), self.height_points) + (self.root_states[:, :3]).unsqueeze(1)
+            points = quat_apply_yaw(self.base_quat.repeat(1, self.num_height_points), self.height_points) + (self.hand_states[:, :3]).unsqueeze(1)
 
         points += self.terrain.cfg.border_size
         points = (points/self.terrain.cfg.horizontal_scale).long()
@@ -970,7 +974,7 @@ class Arm(BaseTask):
 
     def _reward_base_height(self):
         # Penalize base height away from target
-        base_height = torch.mean(self.root_states[:, 2].unsqueeze(1) - self.measured_heights, dim=1)
+        base_height = torch.mean(self.hand_states[:, 2].unsqueeze(1) - self.measured_heights, dim=1)
         return torch.square(base_height - self.cfg.rewards.base_height_target)
     
     def _reward_torques(self):
@@ -1050,5 +1054,5 @@ class Arm(BaseTask):
     
     def _reward_reach(self):
         # reward for reach the target
-        hammer_head_pos = torch.mean(self.root_states[:, 2].unsqueeze(1) - self.measured_heights, dim=1)
+        hammer_head_pos = torch.mean(self.hand_states[:, 2].unsqueeze(1) - self.measured_heights, dim=1)
         return torch.square(hammer_head_pos - self.cfg.rewards.base_height_target)
