@@ -31,6 +31,7 @@ class AMPLoader:
     HAND_ANGULAR_START_IDX = HAND_ROT_END_IDX
     HAND_ANGULAR_END_IDX = HAND_ANGULAR_START_IDX + HAND_ANGULAR_SIZE
 
+    DEVICE = "cuda:0"
 
     def __init__(
             self,
@@ -263,10 +264,36 @@ class AMPLoader:
     def num_motions(self):
         return len(self.trajectory_names)
     
+
+    def pos_img2arm(p):
+        x_ref = p[0]
+        z_ref = p[1]
+        x_len = 1080
+        z_len = 1920
+        z_real = 1.2
+        x_real = z_real/z_len * x_len
+        x = x_ref/x_len * x_real
+        z = z_ref/z_len * z_real
+        return [x,0.0,z]
+    
     def get_pos(pose):
         return pose[AMPLoader.POS_START_IDX:AMPLoader.POS_END_IDX]
     def get_pos_batch(poses):
-        return poses[:, AMPLoader.POS_START_IDX:AMPLoader.POS_END_IDX]
+        pos_cartisian = poses[:, AMPLoader.POS_START_IDX:AMPLoader.POS_END_IDX]
+        return pos_cartisian
+    def get_pos_carti(poses):
+        pos_cartisian = AMPLoader.get_pos_batch(poses)
+        res = []
+        for i in pos_cartisian:
+            tmp_p = []
+            for j in range(0,len(i),2):
+                tmp_key_p = [i[j],i[j+1]]
+                tmp_p.append(AMPLoader.pos_img2arm(tmp_key_p))
+            res.append(tmp_p)
+        return torch.tensor(res,device=AMPLoader.DEVICE)
+    def get_pos_rot(poses):
+        pos_carti = AMPLoader.get_pos_carti(poses)
+        
     def get_vel(pose):
         return pose[AMPLoader.VEL_START_IDX:AMPLoader.VEL_END_IDX]
     def get_vel_batch(poses):
@@ -289,4 +316,10 @@ if __name__=="__main__":
     # print(dataloader.get_frame_at_time(0,1))
     print(AMPLoader.get_hand_rot_batch(dataloader.trajectories_full[0]))
     print(AMPLoader.get_hand_angular_batch(dataloader.trajectories_full[0]))
+    pos_batch = AMPLoader.get_pos_batch(dataloader.trajectories_full[0])
+    print("pos_batch_size: ",pos_batch.shape)
+    print(AMPLoader.get_pos_carti(dataloader.trajectories_full[0]))
+    
+
+
 

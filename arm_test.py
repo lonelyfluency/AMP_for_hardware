@@ -73,6 +73,7 @@ def nail_knocking_yaw(q, corners):
     y = torch.zeros_like(w)
     z = theta.sin()
     yaw_quats = torch.stack([x, y, z, w], dim=-1)
+    print("yaw_quats: ",yaw_quats)
     return yaw_quats
 
 
@@ -418,6 +419,9 @@ while not gym.query_viewer_has_closed(viewer):
         goal_pos = torch.where(return_to_start, init_pos, grasp_pos)
         goal_rot = torch.where(return_to_start, init_rot, quat_mul(hammer_q, quat_conjugate(yaw_q)))
 
+        print("goal_pos: ",goal_pos)
+        print("goal_rot: ",goal_rot)
+
         # compute position and orientation error
         pos_err = goal_pos - hand_pos
         orn_err = orientation_error(goal_rot, hand_rot)
@@ -432,6 +436,7 @@ while not gym.query_viewer_has_closed(viewer):
         print(u.shape)
         # update position targets
         pos_target = dof_pos + u
+        # print("pos_target: ",pos_target)
 
         # set new position targets
         gym.set_dof_position_target_tensor(sim, gymtorch.unwrap_tensor(pos_target))
