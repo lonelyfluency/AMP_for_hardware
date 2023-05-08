@@ -120,6 +120,7 @@ class TestArm:
         home_angles_arm = [0, 0.4, np.pi, -np.pi+1.4, 0, -1, np.pi/2]
         for i in range(500):
             self.direct_dof_pos_control(home_angles_arm)
+        print("dof_pos",self.get_dof_pos())
         for i in range(400):
             self.ik_tip_vel_control([0.1,0.1,0.2,0,0,0])
         print("dof_pos: ", self.get_dof_pos())

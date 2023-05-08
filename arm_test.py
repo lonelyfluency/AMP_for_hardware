@@ -158,7 +158,9 @@ kinova_ranges = kinova_upper_limits - kinova_lower_limits
 
 print(kinova_ranges)
 
-kinova_mids = [0.0, -1.0, 0.0, +2.6, -1.57, 0.0, 0.0,0,0,0,0,0,0,0,0]
+# kinova_mids = [0.0, -1.0, 0.0, +2.6, -1.57, 0.0, 0.0,0,0,0,0,0,0,0,0]
+kinova_mids = [0, 0.4, np.pi, -np.pi+1.4, 0, -1, np.pi/2,0,0,0,0,0,0,0,0]
+
 # use position drive for all dofs
 kinova_dof_props["driveMode"].fill(gymapi.DOF_MODE_POS)
 kinova_dof_props["stiffness"][:].fill(400.0)
@@ -187,11 +189,14 @@ env_lower = gymapi.Vec3(-spacing, -spacing, 0.0)
 env_upper = gymapi.Vec3(spacing, spacing, spacing)
 print("Creating %d environments" % num_envs)
 
-kinova_pose = gymapi.Transform()
-kinova_pose.p = gymapi.Vec3(0, 0, 0)
 
 table_pose = gymapi.Transform()
 table_pose.p = gymapi.Vec3(0.5, 0.0, 0.5 * table_dims.z)
+
+kinova_pose = gymapi.Transform()
+kinova_pose.p = gymapi.Vec3(table_pose.p.x-0.5*table_dims.x, 0, table_dims.z)
+
+
 
 box_pose = gymapi.Transform()
 nail_pose = gymapi.Transform()
@@ -293,9 +298,11 @@ gym.prepare_sim(sim)
 # initial hand position and orientation tensors
 init_pos = torch.Tensor(hand_pos_list).view(num_envs, 3).to(device)
 init_rot = torch.Tensor(hand_rot_list).view(num_envs, 4).to(device)
+print("init_pos:",init_pos)
+print("init_rot:",init_rot)
 
 # hand orientation for hammering
-hammer_q = torch.stack(num_envs * [torch.tensor([1.0, 0.0, 0.0, 0.0])]).to(device).view((num_envs, 4))
+hammer_q = torch.stack(num_envs * [torch.tensor([0.0, -1.0, 0.0, 0.0])]).to(device).view((num_envs, 4))
 
 # initial base position and orientation tensors
 init_base_pos = torch.Tensor(base_pos_list).view(num_envs, 3).to(device)
@@ -369,9 +376,10 @@ while not gym.query_viewer_has_closed(viewer):
 
         print("hammer_pos: ", hammer_pos)
         print("hammer_rot: ", hammer_rot)
-        print("nail_pos: ", nail_pos)
-        print("nail_rot: ", nail_rot)
-        print("kinova_num_dofs: ",kinova_num_dofs)
+
+        # print("nail_pos: ", nail_pos)
+        # print("nail_rot: ", nail_rot)
+        # print("kinova_num_dofs: ",kinova_num_dofs)
         hand_rotationM = quat_2_rotM(hand_rot)
         print(hand_rotationM)
         hammer_mid = hand_pos.view(num_envs,3,1) + quat_2_rotM(hand_rot).view(3,3).to(torch.float32).to(device) @ HAND_2_HAMMERMID.view(3,1).to(torch.float32).to(device)
@@ -381,9 +389,9 @@ while not gym.query_viewer_has_closed(viewer):
         hammer_tail = hand_pos.view(num_envs,3,1) + quat_2_rotM(hand_rot).view(3,3).to(torch.float32).to(device) @ HAND_2_HAMMERTAIL.view(3,1).to(torch.float32).to(device)
         print("hammer_tail: ",hammer_tail)
         hammer_claw = hand_pos.view(num_envs,3,1) + quat_2_rotM(hand_rot).view(3,3).to(torch.float32).to(device) @ HAND_2_HAMMERCLAW.view(3,1).to(torch.float32).to(device)
-        print("hammer_claw: ",hammer_claw)
+        # print("hammer_claw: ",hammer_claw)
         hammer_grasp = hand_pos.view(num_envs,3,1) + quat_2_rotM(hand_rot).view(3,3).to(torch.float32).to(device) @ HAND_2_HAMMERGRASP.view(3,1).to(torch.float32).to(device)
-        print("hammer_grasp: ",hammer_grasp)
+        # print("hammer_grasp: ",hammer_grasp)
 
 
         to_nail = nail_pos - hand_pos
