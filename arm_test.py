@@ -416,6 +416,7 @@ while not gym.query_viewer_has_closed(viewer):
         grasp_pos[:, 2] = torch.where(above_box, nail_pos[:, 2] + knock_offset, nail_pos[:, 2] + knock_offset * 2.5)
 
         # compute goal position and orientation
+        print("return_to_start: ", return_to_start)
         goal_pos = torch.where(return_to_start, init_pos, grasp_pos)
         goal_rot = torch.where(return_to_start, init_rot, quat_mul(hammer_q, quat_conjugate(yaw_q)))
 
