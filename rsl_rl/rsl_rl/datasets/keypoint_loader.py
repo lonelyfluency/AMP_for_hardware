@@ -11,6 +11,31 @@ from rsl_rl.utils import utils
 from rsl_rl.datasets import pose3d
 from rsl_rl.datasets import motion_util
 
+from scipy.spatial.transform import Rotation as Rot
+
+
+def quaternion_2_euler(q):
+    w,x,y,z = q
+    eps = 0.0009765625
+    thres = 0.5 - eps
+
+    test = w * y - x * z
+    
+    if test < -thres or test > thres:
+        sign = 1 if test > 0 else -1
+        gamma = -2 * sign * math.atan2(x, w)
+        beta = sign * (math.pi / 2)
+        alpha = 0
+    else:
+        alpha = math.atan2(2 * (y*z + w*x), w*w - x*x - y*y + z*z)
+        beta = math.asin(-2 * (x*z - w*y))
+        gamma = math.atan2(2 * (x*y + w*z), w*w + x*x - y*y - z*z)
+    return alpha,beta,gamma
+
+def euler_2_quaternion(eu):
+    rm = Rot.from_euler('xyz',eu,degrees=False)
+    q = rm.as_quat()
+    return q
 
 class AMPLoader:
 
@@ -297,6 +322,16 @@ class AMPLoader:
         pos_hammer_mid = pos_carti[:,1]
         print("pos_hand ",pos_hand)
         print("pos_hammer_mid ",pos_hammer_mid)
+        pos_rot_tan = (pos_hammer_mid[:,2]-pos_hand[:,2]) / (pos_hammer_mid[:,0]-pos_hand[:,0])
+        print("pos_rot_tan",pos_rot_tan)
+        pos_rot_xz = torch.arctan(pos_rot_tan)
+        print("pos_rot_xz ",pos_rot_xz)
+        res = []
+        for i in pos_rot_xz:
+            res.append(euler_2_quaternion([0,0,i.cpu()]))
+        res = torch.tensor(res,device=AMPLoader.DEVICE)
+        return res
+
         
     def get_vel(pose):
         return pose[AMPLoader.VEL_START_IDX:AMPLoader.VEL_END_IDX]
