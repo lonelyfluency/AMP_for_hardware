@@ -293,6 +293,10 @@ class AMPLoader:
         return torch.tensor(res,device=AMPLoader.DEVICE)
     def get_pos_rot(poses):
         pos_carti = AMPLoader.get_pos_carti(poses)
+        pos_hand = pos_carti[:,0]
+        pos_hammer_mid = pos_carti[:,1]
+        print("pos_hand ",pos_hand)
+        print("pos_hammer_mid ",pos_hammer_mid)
         
     def get_vel(pose):
         return pose[AMPLoader.VEL_START_IDX:AMPLoader.VEL_END_IDX]
@@ -319,6 +323,7 @@ if __name__=="__main__":
     pos_batch = AMPLoader.get_pos_batch(dataloader.trajectories_full[0])
     print("pos_batch_size: ",pos_batch.shape)
     print(AMPLoader.get_pos_carti(dataloader.trajectories_full[0]))
+    AMPLoader.get_pos_rot(dataloader.trajectories_full[0])
     
 
 

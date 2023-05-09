@@ -194,7 +194,7 @@ table_pose = gymapi.Transform()
 table_pose.p = gymapi.Vec3(0.5, 0.0, 0.5 * table_dims.z)
 
 kinova_pose = gymapi.Transform()
-kinova_pose.p = gymapi.Vec3(table_pose.p.x-0.5*table_dims.x, 0, table_dims.z)
+kinova_pose.p = gymapi.Vec3(table_pose.p.x-0.5*table_dims.x+0.1, 0, table_dims.z)
 
 
 
@@ -227,7 +227,7 @@ for i in range(num_envs):
     table_handle = gym.create_actor(env, table_asset, table_pose, "table", i, 0)
 
     # add nail
-    nail_pose.p.x = table_pose.p.x + np.random.uniform(-0.3, 0.3)
+    nail_pose.p.x = table_pose.p.x + np.random.uniform(-0.1, 0.3)
     nail_pose.p.y = table_pose.p.y + np.random.uniform(-0.16, 0.16)
     nail_pose.p.z = table_dims.z + 0.5 * nail_size
     nail_pose.r = gymapi.Quat.from_axis_angle(gymapi.Vec3(0, 0, 1), np.random.uniform(-math.pi, math.pi))
