@@ -433,8 +433,8 @@ while not gym.query_viewer_has_closed(viewer):
         # if hand is above box, descend to grasp offset
         # otherwise, seek a position above the box
         above_box = ((nail_dot >= 0.99) & (yaw_dot >= 0.95) & (nail_dist < knock_offset * 3)).squeeze(-1)
-        grasp_pos = nail_pos.clone()
-        grasp_pos[:, 2] = torch.where(above_box, nail_pos[:, 2] + knock_offset, nail_pos[:, 2] + knock_offset * 2.5)
+        grasp_pos = nail_head_pos.clone()
+        grasp_pos[:, 2] = torch.where(above_box, nail_head_pos[:, 2] + knock_offset, nail_head_pos[:, 2] + knock_offset * 2.5)
 
         # compute goal position and orientation
         print("return_to_start: ", return_to_start)
@@ -446,7 +446,7 @@ while not gym.query_viewer_has_closed(viewer):
         print("goal_rot: ",goal_rot)
 
         # compute position and orientation error
-        pos_err = goal_pos - hand_pos
+        pos_err = goal_pos - hammer_head_pos
         orn_err = orientation_error(goal_rot, hand_rot)
         dpose = torch.cat([pos_err, orn_err], -1).unsqueeze(-1)
 
