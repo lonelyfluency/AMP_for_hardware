@@ -262,8 +262,11 @@
                                                     <site name="hammer_grasp" pos="0.051 0.095 0.0155 " class="hammer_site"/>
                                                     <site name="hammer_tail" pos="0.051 0.005 0.0155" class="hammer_site"/>
                                                     <site name="hammer_mid" pos="0.051 0.245 0.0155" class="hammer_site"/>
-                                                    <site name="hammer_head" pos="0.001 0.24 0.0155" class="hammer_site"/>
+                                                    <site name="hammer_head" pos="0.001 0.234 0.0155" class="hammer_site"/>
                                                     <site name="hammer_claw" pos="0.096 0.24 0.0155" class="hammer_site"/>
+                                                    <body name="HammerHead" pos="0.001 0.234 0.0155" quat="0 0.707 0 0.707">
+                                                        <geom type="cylinder" size="0.005 0.002 0"/>
+                                                    </body>
                                                 </body>
                                             </body>
                                         </body>

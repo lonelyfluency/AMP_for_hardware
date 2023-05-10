@@ -131,6 +131,7 @@ class TestArm:
         fk_end_effector_pos = KinovaGen3.forward_kinematics(self.get_dof_pos())
         print("fk end effector position: ", fk_end_effector_pos[0])
         print("fk end effector position eular: ", self._rotation_matrix_2_eular_angles(fk_end_effector_pos[1]))
+        print("jacobian:",KinovaGen3.jacobian(home_angles_arm))
 
 if __name__ == "__main__":
     gen3 = TestArm()

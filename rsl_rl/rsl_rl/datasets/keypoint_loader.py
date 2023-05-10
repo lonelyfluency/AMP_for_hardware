@@ -358,7 +358,7 @@ if __name__=="__main__":
     pos_batch = AMPLoader.get_pos_batch(dataloader.trajectories_full[0])
     print("pos_batch_size: ",pos_batch.shape)
     print(AMPLoader.get_pos_carti(dataloader.trajectories_full[0]))
-    AMPLoader.get_pos_rot(dataloader.trajectories_full[0])
+    print(AMPLoader.get_pos_rot(dataloader.trajectories_full[0]))
     
 
 
