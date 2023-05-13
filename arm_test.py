@@ -36,7 +36,9 @@ HAND_2_HAMMERGRASP = torch.tensor([0, 0, 0.14])
 HAND_2_HAMMERHEAD = torch.tensor([-0.145, 0, 0.19])
 HAND_2_HAMMERTAIL = torch.tensor([0.09, 0, 0.14])
 HAND_2_HAMMERCLAW = torch.tensor([-0.145, 0, 0.095])
-NAIL_2_HAILHEAD = torch.tensor([0.028, 0.168, 0.014])
+# NAIL_2_HAILHEAD = torch.tensor([0.028, 0.168, 0.014])
+NAIL_2_HAILHEAD = torch.tensor([0.028, 0.138, 0.014])
+# NAIL_2_HAILHEAD = torch.tensor([0.028, 0.029, 0.168])
 
 # define helper functions
 def quat_axis(q, axis=0):
@@ -182,8 +184,10 @@ kinova_link_dict = gym.get_asset_rigid_body_dict(kinova_asset)
 kinova_hand_index = kinova_link_dict["base"] # todo change with end effector
 kinova_hammer_head_index = kinova_link_dict["HammerHead"]
 print("kinova_link_dict",kinova_link_dict)
+print("kinova_hand_index",kinova_hand_index)
 print("kinova_hammer_head_index",kinova_hammer_head_index)
 
+print(1/0)
 # configure env grid
 num_envs =16
 num_dof = 15
@@ -229,10 +233,11 @@ for i in range(num_envs):
     table_handle = gym.create_actor(env, table_asset, table_pose, "table", i, 0)
 
     # add nail
-    nail_pose.p.x = table_pose.p.x + np.random.uniform(-0.1, 0.3)
-    nail_pose.p.y = table_pose.p.y + np.random.uniform(-0.16, 0.16)
+    nail_pose.p.x = table_pose.p.x + np.random.uniform(-0.05, 0.2)
+    nail_pose.p.y = table_pose.p.y + np.random.uniform(-0.12, 0.12)
     nail_pose.p.z = table_dims.z + 0.5 * nail_size
-    nail_pose.r = gymapi.Quat.from_axis_angle(gymapi.Vec3(0, 0, 1), np.random.uniform(-math.pi, math.pi))
+    # nail_pose.r = gymapi.Quat.from_axis_angle(gymapi.Vec3(0, 0, 1), np.random.uniform(-math.pi, math.pi))
+    nail_pose.r = gymapi.Quat.from_axis_angle(gymapi.Vec3(0, 0, 1), np.random.uniform(-0.001, 0.001))
     nail_handle = gym.create_actor(env, nail_asset, nail_pose, "nail", i, 0)
     color = gymapi.Vec3(np.random.uniform(0, 1), np.random.uniform(0, 1), np.random.uniform(0, 1))
     gym.set_rigid_body_color(env, nail_handle, 0, gymapi.MESH_VISUAL_AND_COLLISION, color)
@@ -340,7 +345,7 @@ print("jeef[0,0:7]",j_eef[0,:])
 _rb_states = gym.acquire_rigid_body_state_tensor(sim)
 rb_states = gymtorch.wrap_tensor(_rb_states)
 print(rb_states)
-print(1/0)
+# print(1/0)
 # get dof state tensor
 _dof_states = gym.acquire_dof_state_tensor(sim)
 dof_states = gymtorch.wrap_tensor(_dof_states)
