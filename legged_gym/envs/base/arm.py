@@ -51,18 +51,12 @@ from rsl_rl.datasets.keypoint_loader import AMPLoader
 from .KinovaGen3 import *
 
 
-# COM_OFFSET = torch.tensor([0.012731, 0.002186, 0.000515])
-# HIP_OFFSETS = torch.tensor([
-#     [0.183, 0.047, 0.],
-#     [0.183, -0.047, 0.],
-#     [-0.183, 0.047, 0.],
-#     [-0.183, -0.047, 0.]]) + COM_OFFSET
-
 HAND_2_HAMMERMID = torch.tensor([-0.15, 0, 0.14])
 HAND_2_HAMMERGRASP = torch.tensor([0, 0, 0.14])
 HAND_2_HAMMERHEAD = torch.tensor([-0.145, 0, 0.19])
 HAND_2_HAMMERTAIL = torch.tensor([0.09, 0, 0.14])
 HAND_2_HAMMERCLAW = torch.tensor([-0.145, 0, 0.095])
+NAIL_2_HAILHEAD = torch.tensor([0.028, 0.138, 0.034])
 
 class Arm(BaseTask):
     def __init__(self, cfg: ArmCfg, sim_params, physics_engine, sim_device, headless):
