@@ -47,23 +47,36 @@ def quat_axis(q, axis=0):
     basis_vec[:, axis] = 1
     return quat_rotate(q, basis_vec)
 
-def quat_2_rotM(q):
-    res = []
-    for i in q:
-        tq = i
-        w,x,y,z = tq[3],tq[0],tq[1],tq[2]
-        Rq = np.zeros((3,3),dtype=np.float64)
-        Rq[0,0] = 1 - 2*y**2 - 2*z**2
-        Rq[0,1] = 2*x*y - 2*z*w
-        Rq[0,2] = 2*x*z + 2*y*w
-        Rq[1,0] = 2*x*y + 2*z*w
-        Rq[1,1] = 1 - 2*x**2 - 2*z**2
-        Rq[1,2] = 2*y*z - 2*x*w
-        Rq[2,0] = 2*x*z - 2*y*w
-        Rq[2,1] = 2*y*z + 2*x*w
-        Rq[2,2] = 1 - 2*x**2 - 2*y**2
-        res.append(Rq)
-    return torch.tensor(res,dtype=torch.double)
+def quat_2_rotMat(q):
+    """
+    Convert rotations given as quaternions to rotation matrices.
+
+    Args:
+        quaternions: quaternions with real part first,
+            as tensor of shape (..., 4).
+
+    Returns:
+        Rotation matrices as tensor of shape (..., 3, 3).
+    """
+    i, j, k, r = torch.unbind(q, -1)
+    # pyre-fixme[58]: `/` is not supported for operand types `float` and `Tensor`.
+    two_s = 2.0 / (q * q).sum(-1)
+
+    o = torch.stack(
+        (
+            1 - two_s * (j * j + k * k),
+            two_s * (i * j - k * r),
+            two_s * (i * k + j * r),
+            two_s * (i * j + k * r),
+            1 - two_s * (i * i + k * k),
+            two_s * (j * k - i * r),
+            two_s * (i * k - j * r),
+            two_s * (j * k + i * r),
+            1 - two_s * (i * i + j * j),
+        ),
+        -1,
+    )
+    return o.reshape(q.shape[:-1] + (3, 3))
 
 def orientation_error(desired, current):
     cc = quat_conjugate(current)
@@ -183,7 +196,7 @@ kinova_hand_index = kinova_link_dict["base"] # todo change with end effector
 kinova_hammer_head_index = kinova_link_dict["HammerHead"]
 
 # configure env grid
-num_envs =16
+num_envs = 1600
 num_dof = 15
 num_per_row = int(math.sqrt(num_envs))
 spacing = 1.0
@@ -362,6 +375,7 @@ while not gym.query_viewer_has_closed(viewer):
     gym.refresh_jacobian_tensors(sim)
 
     if 20<= counter <= 30:
+    # if counter == 20:
         nail_pos = rb_states[nail_idxs, :3]
         nail_rot = rb_states[nail_idxs, 3:7]
 
@@ -374,11 +388,11 @@ while not gym.query_viewer_has_closed(viewer):
         hammer_pos = rb_states[hammer_idxs, :3]
         hammer_rot = rb_states[hammer_idxs, 3:7]
 
-        hammer_mid = hand_pos.view(num_envs,3,1) + quat_2_rotM(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERMID.view(3,1).to(torch.float32).to(device)
-        hammer_head = hand_pos.view(num_envs,3,1) + quat_2_rotM(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERHEAD.view(3,1).to(torch.float32).to(device)
-        hammer_tail = hand_pos.view(num_envs,3,1) + quat_2_rotM(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERTAIL.view(3,1).to(torch.float32).to(device)
-        hammer_claw = hand_pos.view(num_envs,3,1) + quat_2_rotM(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERCLAW.view(3,1).to(torch.float32).to(device)
-        hammer_grasp = hand_pos.view(num_envs,3,1) + quat_2_rotM(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERGRASP.view(3,1).to(torch.float32).to(device)
+        hammer_mid = hand_pos.view(num_envs,3,1) + quat_2_rotMat(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERMID.view(3,1).to(torch.float32).to(device)
+        hammer_head = hand_pos.view(num_envs,3,1) + quat_2_rotMat(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERHEAD.view(3,1).to(torch.float32).to(device)
+        hammer_tail = hand_pos.view(num_envs,3,1) + quat_2_rotMat(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERTAIL.view(3,1).to(torch.float32).to(device)
+        hammer_claw = hand_pos.view(num_envs,3,1) + quat_2_rotMat(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERCLAW.view(3,1).to(torch.float32).to(device)
+        hammer_grasp = hand_pos.view(num_envs,3,1) + quat_2_rotMat(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERGRASP.view(3,1).to(torch.float32).to(device)
 
         # print("hammer_mid: ",hammer_mid)
         # print("hammer_head: ",hammer_head)
@@ -392,7 +406,7 @@ while not gym.query_viewer_has_closed(viewer):
         hammer_claw_pos = hammer_claw.view(num_envs,3)
         hammer_grasp_pos = hammer_grasp.view(num_envs,3)
 
-        nail_head = nail_pos.view(num_envs,3,1) + quat_2_rotM(nail_rot).view(num_envs,3,3).to(torch.float32).to(device) @ NAIL_2_HAILHEAD.view(3,1).to(torch.float32).to(device) 
+        nail_head = nail_pos.view(num_envs,3,1) + quat_2_rotMat(nail_rot).view(num_envs,3,3).to(torch.float32).to(device) @ NAIL_2_HAILHEAD.view(3,1).to(torch.float32).to(device) 
         nail_head_pos = nail_head.view(num_envs,3)
 
         # print("hand_pos ",hand_pos)
@@ -459,7 +473,8 @@ while not gym.query_viewer_has_closed(viewer):
         # set new position targets
         gym.set_dof_position_target_tensor(sim, gymtorch.unwrap_tensor(pos_target))
 
-    if 40<= counter <= 50:
+    if 30<= counter <= 40:
+    # if counter == 40:
         nail_pos = rb_states[nail_idxs, :3]
         nail_rot = rb_states[nail_idxs, 3:7]
 
@@ -472,11 +487,11 @@ while not gym.query_viewer_has_closed(viewer):
         hammer_pos = rb_states[hammer_idxs, :3]
         hammer_rot = rb_states[hammer_idxs, 3:7]
 
-        hammer_mid = hand_pos.view(num_envs,3,1) + quat_2_rotM(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERMID.view(3,1).to(torch.float32).to(device)
-        hammer_head = hand_pos.view(num_envs,3,1) + quat_2_rotM(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERHEAD.view(3,1).to(torch.float32).to(device)
-        hammer_tail = hand_pos.view(num_envs,3,1) + quat_2_rotM(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERTAIL.view(3,1).to(torch.float32).to(device)
-        hammer_claw = hand_pos.view(num_envs,3,1) + quat_2_rotM(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERCLAW.view(3,1).to(torch.float32).to(device)
-        hammer_grasp = hand_pos.view(num_envs,3,1) + quat_2_rotM(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERGRASP.view(3,1).to(torch.float32).to(device)
+        hammer_mid = hand_pos.view(num_envs,3,1) + quat_2_rotMat(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERMID.view(3,1).to(torch.float32).to(device)
+        hammer_head = hand_pos.view(num_envs,3,1) + quat_2_rotMat(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERHEAD.view(3,1).to(torch.float32).to(device)
+        hammer_tail = hand_pos.view(num_envs,3,1) + quat_2_rotMat(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERTAIL.view(3,1).to(torch.float32).to(device)
+        hammer_claw = hand_pos.view(num_envs,3,1) + quat_2_rotMat(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERCLAW.view(3,1).to(torch.float32).to(device)
+        hammer_grasp = hand_pos.view(num_envs,3,1) + quat_2_rotMat(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERGRASP.view(3,1).to(torch.float32).to(device)
 
         hammer_mid_pos = hammer_mid.view(num_envs,3)
         hammer_head_pos = hammer_head.view(num_envs,3)
@@ -484,7 +499,7 @@ while not gym.query_viewer_has_closed(viewer):
         hammer_claw_pos = hammer_claw.view(num_envs,3)
         hammer_grasp_pos = hammer_grasp.view(num_envs,3)
 
-        nail_head = nail_pos.view(num_envs,3,1) + quat_2_rotM(nail_rot).view(num_envs,3,3).to(torch.float32).to(device) @ NAIL_2_HAILHEAD.view(3,1).to(torch.float32).to(device) 
+        nail_head = nail_pos.view(num_envs,3,1) + quat_2_rotMat(nail_rot).view(num_envs,3,3).to(torch.float32).to(device) @ NAIL_2_HAILHEAD.view(3,1).to(torch.float32).to(device) 
         nail_head_pos = nail_head.view(num_envs,3)
 
         # knock
@@ -513,7 +528,7 @@ while not gym.query_viewer_has_closed(viewer):
         # set new position targets
         gym.set_dof_position_target_tensor(sim, gymtorch.unwrap_tensor(pos_target))
 
-    if counter == 51:
+    if counter == 41:
         counter = 0
         nail_pos = rb_states[nail_idxs, :3]
         nail_rot = rb_states[nail_idxs, 3:7]
@@ -527,11 +542,11 @@ while not gym.query_viewer_has_closed(viewer):
         hammer_pos = rb_states[hammer_idxs, :3]
         hammer_rot = rb_states[hammer_idxs, 3:7]
 
-        hammer_mid = hand_pos.view(num_envs,3,1) + quat_2_rotM(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERMID.view(3,1).to(torch.float32).to(device)
-        hammer_head = hand_pos.view(num_envs,3,1) + quat_2_rotM(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERHEAD.view(3,1).to(torch.float32).to(device)
-        hammer_tail = hand_pos.view(num_envs,3,1) + quat_2_rotM(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERTAIL.view(3,1).to(torch.float32).to(device)
-        hammer_claw = hand_pos.view(num_envs,3,1) + quat_2_rotM(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERCLAW.view(3,1).to(torch.float32).to(device)
-        hammer_grasp = hand_pos.view(num_envs,3,1) + quat_2_rotM(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERGRASP.view(3,1).to(torch.float32).to(device)
+        hammer_mid = hand_pos.view(num_envs,3,1) + quat_2_rotMat(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERMID.view(3,1).to(torch.float32).to(device)
+        hammer_head = hand_pos.view(num_envs,3,1) + quat_2_rotMat(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERHEAD.view(3,1).to(torch.float32).to(device)
+        hammer_tail = hand_pos.view(num_envs,3,1) + quat_2_rotMat(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERTAIL.view(3,1).to(torch.float32).to(device)
+        hammer_claw = hand_pos.view(num_envs,3,1) + quat_2_rotMat(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERCLAW.view(3,1).to(torch.float32).to(device)
+        hammer_grasp = hand_pos.view(num_envs,3,1) + quat_2_rotMat(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERGRASP.view(3,1).to(torch.float32).to(device)
 
         hammer_mid_pos = hammer_mid.view(num_envs,3)
         hammer_head_pos = hammer_head.view(num_envs,3)
@@ -539,43 +554,16 @@ while not gym.query_viewer_has_closed(viewer):
         hammer_claw_pos = hammer_claw.view(num_envs,3)
         hammer_grasp_pos = hammer_grasp.view(num_envs,3)
 
-        nail_head = nail_pos.view(num_envs,3,1) + quat_2_rotM(nail_rot).view(num_envs,3,3).to(torch.float32).to(device) @ NAIL_2_HAILHEAD.view(3,1).to(torch.float32).to(device) 
+        nail_head = nail_pos.view(num_envs,3,1) + quat_2_rotMat(nail_rot).view(num_envs,3,3).to(torch.float32).to(device) @ NAIL_2_HAILHEAD.view(3,1).to(torch.float32).to(device) 
         nail_head_pos = nail_head.view(num_envs,3)
 
-        print("after knock hammer-head-pos: ",hammer_head_pos)
-        print("after knock nail_head_pos: ",nail_head_pos)
-        print("after knock head-nail pos: ",hammer_head_pos - nail_head_pos)
-
-        # # knock
-        # goal_pos = nail_head_pos.clone()
-        # goal_rot = torch.where(return_to_start, init_rot, hammer_q)
-
-        # # compute position and orientation error
-        # pos_err = goal_pos - hammer_head_pos
-        # orn_err = orientation_error(goal_rot, hand_rot)
-        # dpose = torch.cat([pos_err, orn_err], -1).unsqueeze(-1)
-
-        # print("dpose",dpose.view(num_envs,6))
-
-        # print("jeef[0,0:7]",j_eef[0,:])
-        # # solve damped least squares
-        # j_eef_T = torch.transpose(j_eef, 1, 2)
-        # d = 0.05  # damping term
-        # lmbda = torch.eye(6).to(device) * (d ** 2)
-        # u = (j_eef_T @ torch.inverse(j_eef @ j_eef_T + lmbda) @ dpose).view(num_envs, 15, 1)
-        # print(dof_pos.shape)
-        # print(u.shape)
-        # # update position targets
-        # pos_target = dof_pos + u
-        # print("pos_target: ",pos_target.view(num_envs,15))
-
-        # # set new position targets
-        # gym.set_dof_position_target_tensor(sim, gymtorch.unwrap_tensor(pos_target))
+        # print("after knock hammer-head-pos: ",hammer_head_pos)
+        # print("after knock nail_head_pos: ",nail_head_pos)
+        # print("after knock head-nail pos: ",hammer_head_pos - nail_head_pos)
 
         pos_vel = torch.zeros((num_envs,15),device='cuda:0')
         gym.set_dof_velocity_target_tensor(sim,gymtorch.unwrap_tensor(pos_vel))
         
-
 
 
     elif counter == 250:
