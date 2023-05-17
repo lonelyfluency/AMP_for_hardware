@@ -56,7 +56,7 @@ HAND_2_HAMMERGRASP = torch.tensor([0, 0, 0.14])
 HAND_2_HAMMERHEAD = torch.tensor([-0.145, 0, 0.19])
 HAND_2_HAMMERTAIL = torch.tensor([0.09, 0, 0.14])
 HAND_2_HAMMERCLAW = torch.tensor([-0.145, 0, 0.095])
-NAIL_2_HAILHEAD = torch.tensor([0.028, 0.138, 0.034])
+NAIL_2_NAILHEAD = torch.tensor([0.028, 0.168, 0.014])
 
 class Arm(BaseTask):
     def __init__(self, cfg: ArmCfg, sim_params, physics_engine, sim_device, headless):

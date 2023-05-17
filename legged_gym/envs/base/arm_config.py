@@ -30,13 +30,13 @@ import numpy as np
 
 class ArmCfg(BaseConfig):
     class env:
-        num_envs = 4096
-        num_observations = 235
+        num_envs = 144
+        num_observations = 14
         num_privileged_obs = None # if not None a priviledge_obs_buf will be returned by step() (critic obs for assymetric training). None is returned otherwise 
-        num_actions = 15
+        num_actions = 4
         env_spacing = 3.  # not used with heightfields/trimeshes 
         send_timeouts = True # send time out information to the algorithm
-        episode_length_s = 20 # episode length in seconds
+        episode_length_s = 5 # episode length in seconds
         reference_state_initialization = False # initialize state from reference data
 
     class terrain:
@@ -67,20 +67,18 @@ class ArmCfg(BaseConfig):
     class commands:
         curriculum = False
         max_curriculum = 1.
-        num_commands = 6 # default: lin_vel_tip_x, lin_vel_tip_y, lin_vel_tip_z, ang_vel_tip_a, ang_vel_tip_b, ang_vel_tip_c
+        num_commands = 4 # default: x y z for hammer head, alpha for hammer head and hand pitch angle.
         resampling_time = 10. # time before command are changed[s]
         heading_command = True # if true: compute ang vel command from heading error
         class ranges:
-            lin_vel_x = [-0.3, 0.3] # min max [m/s]
-            lin_vel_y = [-0.3, 0.3]   # min max [m/s]
-            lin_vel_z = [-0.3, 0.3]   # min max [m/s]
-            ang_vel_a = [-1.57, 1.57]    # min max [rad/s]
-            ang_vel_b = [-1.57, 1.57]    # min max [rad/s]
-            ang_vel_c = [-1.57, 1.57]    # min max [rad/s]
+            x_range = [-0.1, 0.7] # min max [m]
+            y_range = [-0.3, 0.3]   # min max [m]
+            z_range = [0, 0.6]   # min max [m]
+            a_range = [-1.57, 1.57]
 
     class init_state:
-        pos = [0.0, 0.0, 1.] # x,y,z [m]
-        rot = [0.0, 0.0, 0.0, 1.0] # x,y,z,w [quat]
+        pos = [0.6183, 0.0014, 0.5512] # x,y,z [m]
+        rot = [0.0, 1.0, 0.0, 0.0] # x,y,z,w [quat]
         lin_vel = [0.0, 0.0, 0.0]  # x,y,z [m/s]
         ang_vel = [0.0, 0.0, 0.0]  # x,y,z [rad/s]
         default_joint_angles = { # target angles when action = 0.0
@@ -118,7 +116,7 @@ class ArmCfg(BaseConfig):
         terminate_after_contacts_on = []
         disable_gravity = False
         collapse_fixed_joints = True # merge bodies connected by fixed joints. Specific fixed joints can be kept by adding " <... dont_collapse="true">
-        fix_base_link = False # fixe the base of the robot
+        fix_base_link = True # fixe the base of the robot
         default_dof_drive_mode = 3 # see GymDofDriveModeFlags (0 is none, 1 is pos tgt, 2 is vel tgt, 3 effort)
         self_collisions = 0 # 1 to disable, 0 to enable...bitwise filter
         replace_cylinder_with_capsule = True # replace collision cylinders with capsules, leads to faster/more stable simulation

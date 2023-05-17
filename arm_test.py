@@ -196,7 +196,7 @@ kinova_hand_index = kinova_link_dict["base"] # todo change with end effector
 kinova_hammer_head_index = kinova_link_dict["HammerHead"]
 
 # configure env grid
-num_envs = 1600
+num_envs = 16
 num_dof = 15
 num_per_row = int(math.sqrt(num_envs))
 spacing = 1.0
@@ -408,6 +408,13 @@ while not gym.query_viewer_has_closed(viewer):
 
         nail_head = nail_pos.view(num_envs,3,1) + quat_2_rotMat(nail_rot).view(num_envs,3,3).to(torch.float32).to(device) @ NAIL_2_HAILHEAD.view(3,1).to(torch.float32).to(device) 
         nail_head_pos = nail_head.view(num_envs,3)
+
+        if counter == 20:
+            print("hammer_head_pos ",hammer_head_pos)
+            print("hand_rot ",hand_rot)
+            delta_hammer_head_2_hand = hammer_head_pos - hand_pos
+            tan_alpha = delta_hammer_head_2_hand[:,2] / delta_hammer_head_2_hand[:,0]
+            print("hammer_2_hand_angle ",torch.arctan(tan_alpha))
 
         # print("hand_pos ",hand_pos)
         # print("hammer_head_pos ",hammer_head_pos)
