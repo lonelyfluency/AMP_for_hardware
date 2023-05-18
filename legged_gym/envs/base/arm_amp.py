@@ -48,7 +48,6 @@ from legged_gym.utils.math import quat_apply_yaw, wrap_to_pi, torch_rand_sqrt_fl
 from legged_gym.utils.helpers import class_to_dict
 from .arm_config import ArmCfg
 from rsl_rl.datasets.keypoint_loader import AMPLoader
-from .KinovaGen3 import *
 
 
 HAND_2_HAMMERMID = torch.tensor([-0.15, 0, 0.14])
@@ -57,6 +56,48 @@ HAND_2_HAMMERHEAD = torch.tensor([-0.145, 0, 0.19])
 HAND_2_HAMMERTAIL = torch.tensor([0.09, 0, 0.14])
 HAND_2_HAMMERCLAW = torch.tensor([-0.145, 0, 0.095])
 NAIL_2_NAILHEAD = torch.tensor([0.028, 0.168, 0.014])
+
+# define helper functions
+def quat_2_rotMat(q):
+    """
+    Convert rotations given as quaternions to rotation matrices.
+
+    Args:
+        quaternions: quaternions with real part first,
+            as tensor of shape (..., 4).
+
+    Returns:
+        Rotation matrices as tensor of shape (..., 3, 3).
+    """
+    i, j, k, r = torch.unbind(q, -1)
+    # pyre-fixme[58]: `/` is not supported for operand types `float` and `Tensor`.
+    two_s = 2.0 / (q * q).sum(-1)
+
+    o = torch.stack(
+        (
+            1 - two_s * (j * j + k * k),
+            two_s * (i * j - k * r),
+            two_s * (i * k + j * r),
+            two_s * (i * j + k * r),
+            1 - two_s * (i * i + k * k),
+            two_s * (j * k - i * r),
+            two_s * (i * k - j * r),
+            two_s * (j * k + i * r),
+            1 - two_s * (i * i + j * j),
+        ),
+        -1,
+    )
+    return o.reshape(q.shape[:-1] + (3, 3))
+
+def quat_axis(q, axis=0):
+    basis_vec = torch.zeros(q.shape[0], 3, device=q.device)
+    basis_vec[:, axis] = 1
+    return quat_rotate(q, basis_vec)
+
+def orientation_error(desired, current):
+    cc = quat_conjugate(current)
+    q_r = quat_mul(desired, cc)
+    return q_r[:, 0:3] * torch.sign(q_r[:, 3]).unsqueeze(-1)
 
 class Arm(BaseTask):
     def __init__(self, cfg: ArmCfg, sim_params, physics_engine, sim_device, headless):
@@ -184,8 +225,7 @@ class Arm(BaseTask):
 
     def reset_idx(self, env_ids):
         """ Reset some environments.
-            Calls self._reset_dofs(env_ids), self._reset_hand_states(env_ids), and self._resample_commands(env_ids)
-            [Optional] calls self._update_terrain_curriculum(env_ids), self.update_command_curriculum(env_ids) and
+            Calls self._reset_dofs(env_ids), self._reset_hand_states(env_ids), and self._resample_commands(env_ids) and
             Logs episode info
             Resets some buffers
 
@@ -593,21 +633,23 @@ class Arm(BaseTask):
         """
         # get gym GPU state tensors
         actor_root_state = self.gym.acquire_actor_root_state_tensor(self.sim)
+        arm_state = self.gym.acquire_rigid_body_state_tensor(self.sim)
         dof_state_tensor = self.gym.acquire_dof_state_tensor(self.sim)
         net_contact_forces = self.gym.acquire_net_contact_force_tensor(self.sim)
         _jacobian = self.gym.acquire_jacobian_tensor(self.sim, "kinova")
-        jacobian = gymtorch.wrap_tensor(_jacobian)
-        j_eef = jacobian[:, kinova_hammer_head_index - 1, :]
+        
         self.gym.refresh_dof_state_tensor(self.sim)
         self.gym.refresh_actor_root_state_tensor(self.sim)
         self.gym.refresh_net_contact_force_tensor(self.sim)
 
         # create some wrapper tensors for different slices
-        self.hand_states = gymtorch.wrap_tensor(actor_root_state)
+        self.gen3_base_states = gymtorch.wrap_tensor(actor_root_state)
+        self.arm_states = gymtorch.wrap_tensor(arm_state)
         self.dof_state = gymtorch.wrap_tensor(dof_state_tensor)
         self.dof_pos = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 0]
         self.dof_vel = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 1]
-        self.base_quat = self.hand_states[:, 3:7]
+        self.base_quat = self.gen3_base_states[:, 3:7]
+        self.jacobian = gymtorch.wrap_tensor(_jacobian)
 
         self.contact_forces = gymtorch.wrap_tensor(net_contact_forces).view(self.num_envs, -1, 3) # shape: num_envs, num_bodies, xyz axis
 
