@@ -316,16 +316,37 @@ class AMPLoader:
                 tmp_p.append(AMPLoader.pos_img2arm(tmp_key_p))
             res.append(tmp_p)
         return torch.tensor(res,device=AMPLoader.DEVICE)
-    def get_pos_rot(poses):
+    
+    def get_pos_hammer_head(poses):
+        pos_carti = AMPLoader.get_pos_carti(poses)
+        pos_hammer_head = pos_carti[:,2]
+        return pos_hammer_head
+    
+    def get_pos_hand(poses):
+        pos_carti = AMPLoader.get_pos_carti(poses)
+        pos_hand = pos_carti[:,0]
+        return pos_hand
+
+    def get_pos_rot_hand2mid(poses):
         pos_carti = AMPLoader.get_pos_carti(poses)
         pos_hand = pos_carti[:,0]
         pos_hammer_mid = pos_carti[:,1]
-        print("pos_hand ",pos_hand)
-        print("pos_hammer_mid ",pos_hammer_mid)
+
         pos_rot_tan = (pos_hammer_mid[:,2]-pos_hand[:,2]) / (pos_hammer_mid[:,0]-pos_hand[:,0])
-        print("pos_rot_tan",pos_rot_tan)
         pos_rot_xz = torch.arctan(pos_rot_tan)
-        print("pos_rot_xz ",pos_rot_xz)
+        res = []
+        for i in pos_rot_xz:
+            res.append(euler_2_quaternion([0,0,i.cpu()]))
+        res = torch.tensor(res,device=AMPLoader.DEVICE)
+        return res
+    
+    def get_pos_rot_hand2head(poses):
+        pos_carti = AMPLoader.get_pos_carti(poses)
+        print("pos_carti:",pos_carti)
+        pos_hand = pos_carti[:,0]
+        pos_hammer_head = pos_carti[:,2]
+        pos_rot_tan = (pos_hammer_head[:,2]-pos_hand[:,2]) / (pos_hammer_head[:,0]-pos_hand[:,0])
+        pos_rot_xz = torch.arctan(pos_rot_tan)
         res = []
         for i in pos_rot_xz:
             res.append(euler_2_quaternion([0,0,i.cpu()]))
@@ -350,15 +371,12 @@ class AMPLoader:
     
 if __name__=="__main__":
     dataloader = AMPLoader(device="cuda:0", time_between_frames=0.017)
-    
-    print(dataloader.trajectories_full[0])
-    # print(dataloader.get_frame_at_time(0,1))
-    print(AMPLoader.get_hand_rot_batch(dataloader.trajectories_full[0]))
-    print(AMPLoader.get_hand_angular_batch(dataloader.trajectories_full[0]))
+    poses = dataloader.trajectories_full[0]
     pos_batch = AMPLoader.get_pos_batch(dataloader.trajectories_full[0])
-    print("pos_batch_size: ",pos_batch.shape)
-    print(AMPLoader.get_pos_carti(dataloader.trajectories_full[0]))
-    print(AMPLoader.get_pos_rot(dataloader.trajectories_full[0]))
+    hammer_head_pos = AMPLoader.get_pos_hammer_head(poses)
+    hammer_head_rot = AMPLoader.get_pos_rot_hand2head(poses)
+    print("hammer_head_pos:",hammer_head_pos)
+    print("hammer_head_rot:",hammer_head_rot)
     
 
 
