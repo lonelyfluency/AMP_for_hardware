@@ -693,6 +693,28 @@ class Arm(BaseTask):
                     print(f"PD gain of joint {name} were not defined, setting them to zero")
         self.default_dof_pos = self.default_dof_pos.unsqueeze(0)
 
+    def _get_keypoint_pos_rot(self):
+        _rb_states = self.gym.acquire_rigid_body_state_tensor(self.sim)
+        rb_states = gymtorch.wrap_tensor(_rb_states)
+        self.nail_pos = self.arm_states[nail_idxs, :3]
+        nail_rot = rb_states[nail_idxs, 3:7]
+
+        base_pos = rb_states[base_idxs, :3]
+        base_rot = rb_states[base_idxs, 3:7]
+
+        hand_pos = rb_states[hand_idxs, :3]
+        hand_rot = rb_states[hand_idxs, 3:7]
+
+        hammer_pos = rb_states[hammer_idxs, :3]
+        hammer_rot = rb_states[hammer_idxs, 3:7]
+
+        hammer_mid = hand_pos.view(num_envs,3,1) + quat_2_rotMat(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERMID.view(3,1).to(torch.float32).to(device)
+        hammer_head = hand_pos.view(num_envs,3,1) + quat_2_rotMat(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERHEAD.view(3,1).to(torch.float32).to(device)
+        hammer_tail = hand_pos.view(num_envs,3,1) + quat_2_rotMat(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERTAIL.view(3,1).to(torch.float32).to(device)
+        hammer_claw = hand_pos.view(num_envs,3,1) + quat_2_rotMat(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERCLAW.view(3,1).to(torch.float32).to(device)
+        hammer_grasp = hand_pos.view(num_envs,3,1) + quat_2_rotMat(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERGRASP.view(3,1).to(torch.float32).to(device)
+
+
     def _is_rotation_matrix(self,R):
         Rt = np.transpose(R)
         should_be_identity = np.dot(Rt,R)
@@ -713,17 +735,11 @@ class Arm(BaseTask):
             y = np.arctan2(-R[2,0],sy)
             z = 0
         return np.array([x,y,z])
+    
 
-    def hand_positions_in_base_frame(self, dof_angles):
-        res = []
-        dof_ang = dof_angles.cpu()
-        for i in range(self.num_envs):
-            hand_positions = forward_kinematics(dof_ang[i])
-            hand_pos = hand_positions[0]
-            hand_R = hand_positions[1]
-            hand_eular = self._rotation_matrix_2_eular_angles(hand_R)
-            res.append(np.concatenate((hand_pos, hand_eular),axis=-1))
-        return np.array(res)
+    def hammer_head_positions_in_base_frame(self, dof_angles):
+        # use rbstate index cuda.
+        pass
 
     def _prepare_reward_function(self):
         """ Prepares a list of reward functions, whcih will be called to compute the total reward.
@@ -832,6 +848,10 @@ class Arm(BaseTask):
         # save body names from the asset
         body_names = self.gym.get_asset_rigid_body_names(robot_asset)
         self.dof_names = self.gym.get_asset_dof_names(robot_asset)
+        self.dof_dict = self.gym.get_asset_joint_dict(robot_asset)
+        self.body_dict = self.gym.get_asset_rigid_body_dict(robot_asset)
+        self.hammer_head_index = self.body_dict["HammerHead"]
+
         self.num_bodies = len(body_names)
         self.num_dofs = len(self.dof_names)
         feet_names = [s for s in body_names if self.cfg.asset.foot_name in s]
@@ -842,7 +862,7 @@ class Arm(BaseTask):
         for name in self.cfg.asset.terminate_after_contacts_on:
             termination_contact_names.extend([s for s in body_names if name in s])
 
-        base_init_state_list = self.cfg.init_state.pos + self.cfg.init_state.rot + self.cfg.init_state.lin_vel + self.cfg.init_state.ang_vel
+        base_init_state_list = self.cfg.init_state.hammer_head_pos + self.cfg.init_state.hand_pos + self.cfg.init_state.hand_rot + self.cfg.init_state.lin_vel + self.cfg.init_state.ang_vel
         self.base_init_state = to_torch(base_init_state_list, device=self.device, requires_grad=False)
         start_pose = gymapi.Transform()
         start_pose.p = gymapi.Vec3(*self.base_init_state[:3])

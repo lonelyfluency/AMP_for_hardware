@@ -411,6 +411,7 @@ while not gym.query_viewer_has_closed(viewer):
 
         if counter == 20:
             print("hammer_head_pos ",hammer_head_pos)
+            print("hand_pos ",hand_pos)
             print("hand_rot ",hand_rot)
             delta_hammer_head_2_hand = hammer_head_pos - hand_pos
             tan_alpha = delta_hammer_head_2_hand[:,2] / delta_hammer_head_2_hand[:,0]

@@ -66,7 +66,8 @@ class ArmCfg(BaseConfig):
 
     class init_state:
         # define init hammer head state.
-        pos = [0.6183, 0.0014, 0.5512] # x,y,z [m]
+        hammer_head_pos = [0.6183, 0.0014, 0.5512] # x,y,z [m]
+        hand_pos = [0.4784, 0.0014, 0.7312]
         rot = [0.0, 1.0, 0.0, 0.0] # x,y,z,w [quat]
         lin_vel = [0.0, 0.0, 0.0]  # x,y,z [m/s]
         ang_vel = [0.0, 0.0, 0.0]  # x,y,z [rad/s]
