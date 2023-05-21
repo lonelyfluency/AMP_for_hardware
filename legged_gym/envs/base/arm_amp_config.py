@@ -68,7 +68,7 @@ class ArmCfg(BaseConfig):
         # define init hammer head state.
         hammer_head_pos = [0.6183, 0.0014, 0.5512] # x,y,z [m]
         hand_pos = [0.4784, 0.0014, 0.7312]
-        rot = [0.0, 1.0, 0.0, 0.0] # x,y,z,w [quat]
+        hand_rot = [0.0, 1.0, 0.0, 0.0] # x,y,z,w [quat]
         lin_vel = [0.0, 0.0, 0.0]  # x,y,z [m/s]
         ang_vel = [0.0, 0.0, 0.0]  # x,y,z [rad/s]
         default_joint_angles = { # target angles when action = 0.0
@@ -101,6 +101,7 @@ class ArmCfg(BaseConfig):
 
     class asset:
         file = ""
+        nail_file = ""
         hammer_name = "None" # name of the hammer, used to index hammer head state and contact force tensors
         penalize_contacts_on = []
         terminate_after_contacts_on = []

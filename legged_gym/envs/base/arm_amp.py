@@ -46,7 +46,7 @@ from legged_gym.envs.base.base_task import BaseTask
 from legged_gym.utils.terrain import Terrain
 from legged_gym.utils.math import quat_apply_yaw, wrap_to_pi, torch_rand_sqrt_float
 from legged_gym.utils.helpers import class_to_dict
-from .arm_config import ArmCfg
+from .arm_amp_config import ArmCfg
 from rsl_rl.datasets.keypoint_loader import AMPLoader
 
 
@@ -821,8 +821,10 @@ class Arm(BaseTask):
              3. Store indices of different bodies of the robot
         """
         asset_path = self.cfg.asset.file.format(LEGGED_GYM_ROOT_DIR=LEGGED_GYM_ROOT_DIR)
+        nail_asset_path = self.cfg.asset.nail_file.format(LEGGED_GYM_ROOT_DIR=LEGGED_GYM_ROOT_DIR)
         asset_root = os.path.dirname(asset_path)
         asset_file = os.path.basename(asset_path)
+        nail_asset_file = os.path.basename(nail_asset_path)
 
         asset_options = gymapi.AssetOptions()
         asset_options.default_dof_drive_mode = self.cfg.asset.default_dof_drive_mode
@@ -839,11 +841,23 @@ class Arm(BaseTask):
         asset_options.thickness = self.cfg.asset.thickness
         asset_options.disable_gravity = self.cfg.asset.disable_gravity
 
+        # load kinova asset
         robot_asset = self.gym.load_asset(self.sim, asset_root, asset_file, asset_options)
         self.num_dof = self.gym.get_asset_dof_count(robot_asset)
         self.num_bodies = self.gym.get_asset_rigid_body_count(robot_asset)
         dof_props_asset = self.gym.get_asset_dof_properties(robot_asset)
         rigid_shape_props_asset = self.gym.get_asset_rigid_shape_properties(robot_asset)
+
+        # create table asset
+        table_dims = gymapi.Vec3(0.8, 0.6, 0.4)
+        asset_options = gymapi.AssetOptions()
+        asset_options.fix_base_link = True
+        table_asset = self.gym.create_box(self.sim, table_dims.x, table_dims.y, table_dims.z, asset_options)
+
+        # load nail asset
+        nail_size = 0.03
+        asset_options = gymapi.AssetOptions()
+        nail_asset = self.gym.load_asset(self.sim,asset_root,nail_asset_file,asset_options)
 
         # save body names from the asset
         body_names = self.gym.get_asset_rigid_body_names(robot_asset)
@@ -868,27 +882,94 @@ class Arm(BaseTask):
         start_pose.p = gymapi.Vec3(*self.base_init_state[:3])
 
         self._get_env_origins()
-        env_lower = gymapi.Vec3(0., 0., 0.)
-        env_upper = gymapi.Vec3(0., 0., 0.)
+        spacing = 1.0
+        env_lower = gymapi.Vec3(-spacing, -spacing, 0.0)
+        env_upper = gymapi.Vec3(spacing, spacing, spacing)
         self.actor_handles = []
         self.envs = []
+        base_idxs = []
+        nail_idxs = []
+        hand_idxs = []
+        hammer_idxs = []
+        base_pos_list = []
+        base_rot_list = []
+        hand_pos_list = []
+        hand_rot_list = []
+        hammer_pos_list = []
+        hammer_rot_list = []
+
+        # add ground plane
+        plane_params = gymapi.PlaneParams()
+        plane_params.normal = gymapi.Vec3(0, 0, 1)
+        self.gym.add_ground(self.sim, plane_params)
+
         for i in range(self.num_envs):
-            # create env instance
-            env_handle = self.gym.create_env(self.sim, env_lower, env_upper, int(np.sqrt(self.num_envs)))
-            pos = self.env_origins[i].clone()
-            pos[:2] += torch_rand_float(-1., 1., (2,1), device=self.device).squeeze(1)
-            start_pose.p = gymapi.Vec3(*pos)
-                
-            rigid_shape_props = self._process_rigid_shape_props(rigid_shape_props_asset, i)
-            self.gym.set_asset_rigid_shape_properties(robot_asset, rigid_shape_props)
-            anymal_handle = self.gym.create_actor(env_handle, robot_asset, start_pose, "anymal", i, self.cfg.asset.self_collisions, 0)
-            dof_props = self._process_dof_props(dof_props_asset, i)
-            self.gym.set_actor_dof_properties(env_handle, anymal_handle, dof_props)
-            body_props = self.gym.get_actor_rigid_body_properties(env_handle, anymal_handle)
-            body_props = self._process_rigid_body_props(body_props, i)
-            self.gym.set_actor_rigid_body_properties(env_handle, anymal_handle, body_props, recomputeInertia=True)
-            self.envs.append(env_handle)
-            self.actor_handles.append(anymal_handle)
+            # create env
+            env = self.gym.create_env(self.sim, env_lower, env_upper, int(np.sqrt(self.num_envs)))
+            envs.append(env)
+
+            # add table
+            table_handle = self.gym.create_actor(env, table_asset, table_pose, "table", i, 0)
+
+            # add nail
+            nail_pose.p.x = table_pose.p.x + np.random.uniform(-0.05, 0.2)
+            nail_pose.p.y = table_pose.p.y + np.random.uniform(-0.12, 0.12)
+            nail_pose.p.z = table_dims.z + 0.4 * nail_size
+            nail_pose.r = gymapi.Quat.from_axis_angle(gymapi.Vec3(0, 0, 1), np.random.uniform(-math.pi, math.pi))
+            # nail_pose.r = gymapi.Quat.from_axis_angle(gymapi.Vec3(0, 0, 1), np.random.uniform(-0.001, 0.001))
+            nail_handle = gym.create_actor(env, nail_asset, nail_pose, "nail", i, 0)
+            color = gymapi.Vec3(np.random.uniform(0, 1), np.random.uniform(0, 1), np.random.uniform(0, 1))
+            gym.set_rigid_body_color(env, nail_handle, 0, gymapi.MESH_VISUAL_AND_COLLISION, color)
+
+            # get global index of nail in rigid body state tensor
+            nail_idx = gym.get_actor_rigid_body_index(env, nail_handle, 0, gymapi.DOMAIN_SIM)
+            nail_idxs.append(nail_idx)
+
+            # add kinova
+            kinova_handle = gym.create_actor(env, kinova_asset, kinova_pose, "kinova", i, 2)
+
+            # set dof properties
+            gym.set_actor_dof_properties(env, kinova_handle, kinova_dof_props)
+
+            # set initial dof states
+            gym.set_actor_dof_states(env, kinova_handle, default_dof_state, gymapi.STATE_ALL)
+
+            # set initial position targets
+            gym.set_actor_dof_position_targets(env, kinova_handle, default_dof_pos)
+
+            # get base pose
+            base_handle = gym.find_actor_rigid_body_handle(env, kinova_handle, "base_link")
+            base_pose = gym.get_rigid_transform(env, base_handle)
+            base_pos_list.append([base_pose.p.x, base_pose.p.y, base_pose.p.z])
+            base_rot_list.append([base_pose.r.x, base_pose.r.y, base_pose.r.z, base_pose.r.w])
+
+            # get global index of base in rigid body state tensor
+            base_idx = gym.find_actor_rigid_body_index(env, kinova_handle, "base_link", gymapi.DOMAIN_SIM)
+            base_idxs.append(base_idx)
+
+            # get hand pose
+            hand_handle = gym.find_actor_rigid_body_handle(env, kinova_handle, "base")
+            hand_pose = gym.get_rigid_transform(env, hand_handle)
+            hand_pos_list.append([hand_pose.p.x, hand_pose.p.y, hand_pose.p.z])
+            hand_rot_list.append([hand_pose.r.x, hand_pose.r.y, hand_pose.r.z, hand_pose.r.w])
+
+
+            # get global index of hand in rigid body state tensor
+            hand_idx = gym.find_actor_rigid_body_index(env, kinova_handle, "base", gymapi.DOMAIN_SIM)
+            hand_idxs.append(hand_idx)
+
+            # get initial hammer pose
+            hammer_handle = gym.find_actor_rigid_body_handle(env, kinova_handle, "hammer")
+            hammer_pose = gym.get_rigid_transform(env, hammer_handle)
+            hammer_pos_list.append([hammer_pose.p.x, hammer_pose.p.y, hammer_pose.p.z])
+            hammer_rot_list.append([hammer_pose.r.x, hammer_pose.r.y, hammer_pose.r.z, hammer_pose.r.w])
+
+            # get golbal index of hammer in rigid body state tensor
+            hammer_idx = gym.find_actor_rigid_body_index(env, kinova_handle, "hammer", gymapi.DOMAIN_SIM)
+            hammer_idxs.append(hammer_idx)
+            
+
+
 
         self.feet_indices = torch.zeros(len(feet_names), dtype=torch.long, device=self.device, requires_grad=False)
         for i in range(len(feet_names)):
