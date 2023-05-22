@@ -121,6 +121,7 @@ class Arm(BaseTask):
         self.init_done = False
         self._parse_cfg(self.cfg)
         super().__init__(self.cfg, sim_params, physics_engine, sim_device, headless)
+        self.origin = gymapi.Transform()
 
         if not self.headless:
             self.set_camera(self.cfg.viewer.pos, self.cfg.viewer.lookat)
@@ -869,6 +870,8 @@ class Arm(BaseTask):
         kinova_pose = gymapi.Transform()
         kinova_pose.p = gymapi.Vec3(table_pose.p.x-0.5*table_dims.x+0.05, 0, table_dims.z)
 
+        self.origin.p = kinova_pose.p[:]
+
         nail_pose = gymapi.Transform()
 
         self._get_env_origins()
@@ -963,29 +966,17 @@ class Arm(BaseTask):
         """ Sets environment origins. On rough terrain the origins are defined by the terrain platforms.
             Otherwise create a grid.
         """
-        if self.cfg.ground.mesh_type in ["heightfield", "trimesh"]:
-            self.custom_origins = True
-            self.env_origins = torch.zeros(self.num_envs, 3, device=self.device, requires_grad=False)
-            # put arm at the origins defined by the terrain
-            max_init_level = self.cfg.ground.max_init_level
-            
-            self.terrain_levels = torch.randint(0, max_init_level+1, (self.num_envs,), device=self.device)
-            self.terrain_types = torch.div(torch.arange(self.num_envs, device=self.device), (self.num_envs/self.cfg.ground.num_cols), rounding_mode='floor').to(torch.long)
-            self.max_terrain_level = self.cfg.ground.num_rows
-            self.terrain_origins = torch.from_numpy(self.terrain.env_origins).to(self.device).to(torch.float)
-            self.env_origins[:] = self.terrain_origins[self.terrain_levels, self.terrain_types]
-        else:
-            self.custom_origins = False
-            self.env_origins = torch.zeros(self.num_envs, 3, device=self.device, requires_grad=False)
+        self.custom_origins = False
+        self.env_origins = torch.zeros(self.num_envs, 3, device=self.device, requires_grad=False)
 
-            # create a grid of robots
-            num_cols = np.floor(np.sqrt(self.num_envs))
-            num_rows = np.ceil(self.num_envs / num_cols)
-            xx, yy = torch.meshgrid(torch.arange(num_rows), torch.arange(num_cols))
-            spacing = self.cfg.env.env_spacing
-            self.env_origins[:, 0] = spacing * xx.flatten()[:self.num_envs] + 0.05
-            self.env_origins[:, 1] = spacing * yy.flatten()[:self.num_envs]
-            self.env_origins[:, 2] = 0.4
+        # create a grid of robots
+        num_cols = np.floor(np.sqrt(self.num_envs))
+        num_rows = np.ceil(self.num_envs / num_cols)
+        xx, yy = torch.meshgrid(torch.arange(num_rows), torch.arange(num_cols))
+        spacing = self.cfg.env.env_spacing
+        self.env_origins[:, 0] = spacing * xx.flatten()[:self.num_envs] + self.origin.p[0]
+        self.env_origins[:, 1] = spacing * yy.flatten()[:self.num_envs] + self.origin.p[1]
+        self.env_origins[:, 2] = self.origin.p[2]
 
     def _parse_cfg(self, cfg):
         self.dt = self.cfg.control.decimation * self.sim_params.dt
