@@ -39,20 +39,6 @@ class ArmCfg(BaseConfig):
         episode_length_s = 5 # episode length in seconds
         reference_state_initialization = False # initialize state from reference data
 
-    class table:
-        mesh_type = 'plane' # table type
-        x_scale = 0.8 # [m]
-        y_scale = 0.6 # [m]
-        z_scale = 0.4 # [m]
-        max_init_level = 2
-        num_rows= 10 # number of terrain rows (levels)
-        num_cols = 20 # number of terrain cols (types)
-        border_size = 5 # [m]
-        curriculum = False
-        static_friction = 1.0
-        dynamic_friction = 1.0
-        restitution = 0.
-
     class commands:
         curriculum = False
         max_curriculum = 1.

@@ -33,6 +33,7 @@ from time import time
 from warnings import WarningMessage
 import numpy as np
 import os
+import math
 
 from isaacgym.torch_utils import *
 from isaacgym import gymtorch, gymapi, gymutil
@@ -235,7 +236,7 @@ class Arm(BaseTask):
         if len(env_ids) == 0:
             return
         # update curriculum
-        if self.cfg.terrain.curriculum:
+        if self.cfg.ground.curriculum:
             self._update_terrain_curriculum(env_ids)
         # avoid updating command curriculum at each step since the maximum command is common to all envs
         if self.cfg.commands.curriculum and (self.common_step_counter % self.max_episode_length==0):
@@ -264,7 +265,7 @@ class Arm(BaseTask):
             self.extras["episode"]['rew_' + key] = torch.mean(self.episode_sums[key][env_ids]) / self.max_episode_length_s
             self.episode_sums[key][env_ids] = 0.
         # log additional curriculum info
-        if self.cfg.terrain.curriculum:
+        if self.cfg.ground.curriculum:
             self.extras["episode"]["terrain_level"] = torch.mean(self.terrain_levels.float())
         if self.cfg.commands.curriculum:
             self.extras["episode"]["max_command_x"] = self.command_ranges["lin_vel_x"][1]
@@ -303,7 +304,7 @@ class Arm(BaseTask):
                                     self.actions
                                     ),dim=-1)
         # add perceptive inputs if not blind
-        if self.cfg.terrain.measure_heights:
+        if self.cfg.ground.measure_heights:
             heights = torch.clip(self.hammer_states[:, 2].unsqueeze(1) - 0.5 - self.measured_heights, -1, 1.) * self.obs_scales.height_measurements
             self.privileged_obs_buf = torch.cat((self.privileged_obs_buf, heights), dim=-1)
 
@@ -336,9 +337,9 @@ class Arm(BaseTask):
         """
         self.up_axis_idx = 2 # 2 for z, 1 for y -> adapt gravity accordingly
         self.sim = self.gym.create_sim(self.sim_device_id, self.graphics_device_id, self.physics_engine, self.sim_params)
-        mesh_type = self.cfg.terrain.mesh_type
+        mesh_type = self.cfg.ground.mesh_type
         if mesh_type in ['heightfield', 'trimesh']:
-            self.terrain = Terrain(self.cfg.terrain, self.num_envs)
+            self.terrain = Terrain(self.cfg.ground, self.num_envs)
         if mesh_type=='plane':
             self._create_ground_plane()
         elif mesh_type=='heightfield':
@@ -433,7 +434,7 @@ class Arm(BaseTask):
             heading = torch.atan2(forward[:, 1], forward[:, 0])
             self.commands[:, 2] = torch.clip(0.5*wrap_to_pi(self.commands[:, 3] - heading), -1., 1.)
 
-        if self.cfg.terrain.measure_heights:
+        if self.cfg.ground.measure_heights:
             self.measured_heights = self._get_heights()
         # if self.cfg.domain_rand.push_robots and  (self.common_step_counter % self.cfg.domain_rand.push_interval == 0):
         #     self._push_robots()
@@ -670,7 +671,7 @@ class Arm(BaseTask):
         self.hand_lin_vel = quat_rotate_inverse(self.base_quat, self.hammer_states[:, 7:10])
         self.hand_ang_vel = quat_rotate_inverse(self.base_quat, self.hammer_states[:, 10:13])
         self.projected_gravity = quat_rotate_inverse(self.base_quat, self.gravity_vec)
-        if self.cfg.terrain.measure_heights:
+        if self.cfg.ground.measure_heights:
             self.height_points = self._init_height_points()
         self.measured_heights = 0
 
@@ -696,23 +697,23 @@ class Arm(BaseTask):
     def _get_keypoint_pos_rot(self):
         _rb_states = self.gym.acquire_rigid_body_state_tensor(self.sim)
         rb_states = gymtorch.wrap_tensor(_rb_states)
-        self.nail_pos = self.arm_states[nail_idxs, :3]
-        nail_rot = rb_states[nail_idxs, 3:7]
+        self.nail_pos = self.arm_states[self.self.nail_idxs, :3]
+        nail_rot = rb_states[self.nail_idxs, 3:7]
 
-        base_pos = rb_states[base_idxs, :3]
-        base_rot = rb_states[base_idxs, 3:7]
+        base_pos = rb_states[self.base_idxs, :3]
+        base_rot = rb_states[self.base_idxs, 3:7]
 
-        hand_pos = rb_states[hand_idxs, :3]
-        hand_rot = rb_states[hand_idxs, 3:7]
+        hand_pos = rb_states[self.hand_idxs, :3]
+        hand_rot = rb_states[self.hand_idxs, 3:7]
 
-        hammer_pos = rb_states[hammer_idxs, :3]
-        hammer_rot = rb_states[hammer_idxs, 3:7]
+        hammer_pos = rb_states[self.hammer_idxs, :3]
+        hammer_rot = rb_states[self.hammer_idxs, 3:7]
 
-        hammer_mid = hand_pos.view(num_envs,3,1) + quat_2_rotMat(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERMID.view(3,1).to(torch.float32).to(device)
-        hammer_head = hand_pos.view(num_envs,3,1) + quat_2_rotMat(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERHEAD.view(3,1).to(torch.float32).to(device)
-        hammer_tail = hand_pos.view(num_envs,3,1) + quat_2_rotMat(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERTAIL.view(3,1).to(torch.float32).to(device)
-        hammer_claw = hand_pos.view(num_envs,3,1) + quat_2_rotMat(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERCLAW.view(3,1).to(torch.float32).to(device)
-        hammer_grasp = hand_pos.view(num_envs,3,1) + quat_2_rotMat(hand_rot).view(num_envs,3,3).to(torch.float32).to(device) @ HAND_2_HAMMERGRASP.view(3,1).to(torch.float32).to(device)
+        hammer_mid = hand_pos.view(self.num_envs,3,1) + quat_2_rotMat(hand_rot).view(self.num_envs,3,3).to(torch.float32).to(self.device) @ HAND_2_HAMMERMID.view(3,1).to(torch.float32).to(self.device)
+        hammer_head = hand_pos.view(self.num_envs,3,1) + quat_2_rotMat(hand_rot).view(self.num_envs,3,3).to(torch.float32).to(self.device) @ HAND_2_HAMMERHEAD.view(3,1).to(torch.float32).to(self.device)
+        hammer_tail = hand_pos.view(self.num_envs,3,1) + quat_2_rotMat(hand_rot).view(self.num_envs,3,3).to(torch.float32).to(self.device) @ HAND_2_HAMMERTAIL.view(3,1).to(torch.float32).to(self.device)
+        hammer_claw = hand_pos.view(self.num_envs,3,1) + quat_2_rotMat(hand_rot).view(self.num_envs,3,3).to(torch.float32).to(self.device) @ HAND_2_HAMMERCLAW.view(3,1).to(torch.float32).to(self.device)
+        hammer_grasp = hand_pos.view(self.num_envs,3,1) + quat_2_rotMat(hand_rot).view(self.num_envs,3,3).to(torch.float32).to(self.device) @ HAND_2_HAMMERGRASP.view(3,1).to(torch.float32).to(self.device)
 
 
     def _is_rotation_matrix(self,R):
@@ -771,45 +772,10 @@ class Arm(BaseTask):
         """
         plane_params = gymapi.PlaneParams()
         plane_params.normal = gymapi.Vec3(0.0, 0.0, 1.0)
-        plane_params.static_friction = self.cfg.terrain.static_friction
-        plane_params.dynamic_friction = self.cfg.terrain.dynamic_friction
-        plane_params.restitution = self.cfg.terrain.restitution
+        plane_params.static_friction = self.cfg.ground.static_friction
+        plane_params.dynamic_friction = self.cfg.ground.dynamic_friction
+        plane_params.restitution = self.cfg.ground.restitution
         self.gym.add_ground(self.sim, plane_params)
-    
-    def _create_heightfield(self):
-        """ Adds a heightfield terrain to the simulation, sets parameters based on the cfg.
-        """
-        hf_params = gymapi.HeightFieldProperties()
-        hf_params.column_scale = self.terrain.horizontal_scale
-        hf_params.row_scale = self.terrain.horizontal_scale
-        hf_params.vertical_scale = self.terrain.vertical_scale
-        hf_params.nbRows = self.terrain.tot_cols
-        hf_params.nbColumns = self.terrain.tot_rows 
-        hf_params.transform.p.x = -self.terrain.border_size 
-        hf_params.transform.p.y = -self.terrain.border_size
-        hf_params.transform.p.z = 0.0
-        hf_params.static_friction = self.cfg.terrain.static_friction
-        hf_params.dynamic_friction = self.cfg.terrain.dynamic_friction
-        hf_params.restitution = self.cfg.terrain.restitution
-
-        self.gym.add_heightfield(self.sim, self.terrain.heightsamples, hf_params)
-        self.height_samples = torch.tensor(self.terrain.heightsamples).view(self.terrain.tot_rows, self.terrain.tot_cols).to(self.device)
-
-    def _create_trimesh(self):
-        """ Adds a triangle mesh terrain to the simulation, sets parameters based on the cfg.
-        # """
-        tm_params = gymapi.TriangleMeshParams()
-        tm_params.nb_vertices = self.terrain.vertices.shape[0]
-        tm_params.nb_triangles = self.terrain.triangles.shape[0]
-
-        tm_params.transform.p.x = -self.terrain.cfg.border_size 
-        tm_params.transform.p.y = -self.terrain.cfg.border_size
-        tm_params.transform.p.z = 0.0
-        tm_params.static_friction = self.cfg.terrain.static_friction
-        tm_params.dynamic_friction = self.cfg.terrain.dynamic_friction
-        tm_params.restitution = self.cfg.terrain.restitution
-        self.gym.add_triangle_mesh(self.sim, self.terrain.vertices.flatten(order='C'), self.terrain.triangles.flatten(order='C'), tm_params)   
-        self.height_samples = torch.tensor(self.terrain.heightsamples).view(self.terrain.tot_rows, self.terrain.tot_cols).to(self.device)
 
     def _create_envs(self):
         """ Creates environments:
@@ -845,8 +811,30 @@ class Arm(BaseTask):
         robot_asset = self.gym.load_asset(self.sim, asset_root, asset_file, asset_options)
         self.num_dof = self.gym.get_asset_dof_count(robot_asset)
         self.num_bodies = self.gym.get_asset_rigid_body_count(robot_asset)
-        dof_props_asset = self.gym.get_asset_dof_properties(robot_asset)
+        kinova_dof_props = self.gym.get_asset_dof_properties(robot_asset)
         rigid_shape_props_asset = self.gym.get_asset_rigid_shape_properties(robot_asset)
+
+        kinova_lower_limits = kinova_dof_props["lower"]
+        for i in range(len(kinova_lower_limits)):
+            if kinova_lower_limits[i]< -math.pi:
+                kinova_lower_limits[i]=-math.pi
+
+        kinova_upper_limits = kinova_dof_props["upper"]
+        for i in range(len(kinova_upper_limits)):
+            if kinova_upper_limits[i]>math.pi:
+                kinova_upper_limits[i]=math.pi
+        kinova_ranges = kinova_upper_limits - kinova_lower_limits
+
+        # kinova_mids = [0.0, -1.0, 0.0, +2.6, -1.57, 0.0, 0.0,0,0,0,0,0,0,0,0]
+        kinova_mids = [0, 0.4, np.pi, -np.pi+1.4, 0, -1, np.pi/2,0,0,0,0,0,0,0,0]
+
+        # default dof states and position targets
+        kinova_num_dofs = self.gym.get_asset_dof_count(robot_asset)
+        default_dof_pos = np.zeros(kinova_num_dofs, dtype=np.float32)
+        default_dof_pos = kinova_mids
+
+        default_dof_state = np.zeros(kinova_num_dofs, gymapi.DofState.dtype)
+        default_dof_state["pos"] = default_dof_pos
 
         # create table asset
         table_dims = gymapi.Vec3(0.8, 0.6, 0.4)
@@ -865,21 +853,23 @@ class Arm(BaseTask):
         self.dof_dict = self.gym.get_asset_joint_dict(robot_asset)
         self.body_dict = self.gym.get_asset_rigid_body_dict(robot_asset)
         self.hammer_head_index = self.body_dict["HammerHead"]
+        self.hand_index = self.body_dict["base"]
 
         self.num_bodies = len(body_names)
         self.num_dofs = len(self.dof_names)
-        feet_names = [s for s in body_names if self.cfg.asset.foot_name in s]
-        penalized_contact_names = []
-        for name in self.cfg.asset.penalize_contacts_on:
-            penalized_contact_names.extend([s for s in body_names if name in s])
-        termination_contact_names = []
-        for name in self.cfg.asset.terminate_after_contacts_on:
-            termination_contact_names.extend([s for s in body_names if name in s])
 
         base_init_state_list = self.cfg.init_state.hammer_head_pos + self.cfg.init_state.hand_pos + self.cfg.init_state.hand_rot + self.cfg.init_state.lin_vel + self.cfg.init_state.ang_vel
         self.base_init_state = to_torch(base_init_state_list, device=self.device, requires_grad=False)
         start_pose = gymapi.Transform()
         start_pose.p = gymapi.Vec3(*self.base_init_state[:3])
+
+        table_pose = gymapi.Transform()
+        table_pose.p = gymapi.Vec3(0.5 * table_dims.x, 0.0, 0.5 * table_dims.z)
+
+        kinova_pose = gymapi.Transform()
+        kinova_pose.p = gymapi.Vec3(table_pose.p.x-0.5*table_dims.x+0.05, 0, table_dims.z)
+
+        nail_pose = gymapi.Transform()
 
         self._get_env_origins()
         spacing = 1.0
@@ -887,10 +877,10 @@ class Arm(BaseTask):
         env_upper = gymapi.Vec3(spacing, spacing, spacing)
         self.actor_handles = []
         self.envs = []
-        base_idxs = []
-        nail_idxs = []
-        hand_idxs = []
-        hammer_idxs = []
+        self.base_idxs = []
+        self.nail_idxs = []
+        self.hand_idxs = []
+        self.hammer_idxs = []
         base_pos_list = []
         base_rot_list = []
         hand_pos_list = []
@@ -917,85 +907,71 @@ class Arm(BaseTask):
             nail_pose.p.z = table_dims.z + 0.4 * nail_size
             nail_pose.r = gymapi.Quat.from_axis_angle(gymapi.Vec3(0, 0, 1), np.random.uniform(-math.pi, math.pi))
             # nail_pose.r = gymapi.Quat.from_axis_angle(gymapi.Vec3(0, 0, 1), np.random.uniform(-0.001, 0.001))
-            nail_handle = gym.create_actor(env, nail_asset, nail_pose, "nail", i, 0)
+            nail_handle = self.gym.create_actor(env, nail_asset, nail_pose, "nail", i, 0)
             color = gymapi.Vec3(np.random.uniform(0, 1), np.random.uniform(0, 1), np.random.uniform(0, 1))
-            gym.set_rigid_body_color(env, nail_handle, 0, gymapi.MESH_VISUAL_AND_COLLISION, color)
+            self.gym.set_rigid_body_color(env, nail_handle, 0, gymapi.MESH_VISUAL_AND_COLLISION, color)
 
             # get global index of nail in rigid body state tensor
-            nail_idx = gym.get_actor_rigid_body_index(env, nail_handle, 0, gymapi.DOMAIN_SIM)
-            nail_idxs.append(nail_idx)
+            nail_idx = self.gym.get_actor_rigid_body_index(env, nail_handle, 0, gymapi.DOMAIN_SIM)
+            self.nail_idxs.append(nail_idx)
 
             # add kinova
-            kinova_handle = gym.create_actor(env, kinova_asset, kinova_pose, "kinova", i, 2)
+            kinova_handle = self.gym.create_actor(env, robot_asset, kinova_pose, "kinova", i, 2)
 
             # set dof properties
-            gym.set_actor_dof_properties(env, kinova_handle, kinova_dof_props)
+            self.gym.set_actor_dof_properties(env, kinova_handle, kinova_dof_props)
 
             # set initial dof states
-            gym.set_actor_dof_states(env, kinova_handle, default_dof_state, gymapi.STATE_ALL)
+            self.gym.set_actor_dof_states(env, kinova_handle, default_dof_state, gymapi.STATE_ALL)
 
             # set initial position targets
-            gym.set_actor_dof_position_targets(env, kinova_handle, default_dof_pos)
+            self.gym.set_actor_dof_position_targets(env, kinova_handle, default_dof_pos)
 
             # get base pose
-            base_handle = gym.find_actor_rigid_body_handle(env, kinova_handle, "base_link")
-            base_pose = gym.get_rigid_transform(env, base_handle)
+            base_handle = self.gym.find_actor_rigid_body_handle(env, kinova_handle, "base_link")
+            base_pose = self.gym.get_rigid_transform(env, base_handle)
             base_pos_list.append([base_pose.p.x, base_pose.p.y, base_pose.p.z])
             base_rot_list.append([base_pose.r.x, base_pose.r.y, base_pose.r.z, base_pose.r.w])
 
             # get global index of base in rigid body state tensor
-            base_idx = gym.find_actor_rigid_body_index(env, kinova_handle, "base_link", gymapi.DOMAIN_SIM)
-            base_idxs.append(base_idx)
+            base_idx = self.gym.find_actor_rigid_body_index(env, kinova_handle, "base_link", gymapi.DOMAIN_SIM)
+            self.base_idxs.append(base_idx)
 
             # get hand pose
-            hand_handle = gym.find_actor_rigid_body_handle(env, kinova_handle, "base")
-            hand_pose = gym.get_rigid_transform(env, hand_handle)
+            hand_handle = self.gym.find_actor_rigid_body_handle(env, kinova_handle, "base")
+            hand_pose = self.gym.get_rigid_transform(env, hand_handle)
             hand_pos_list.append([hand_pose.p.x, hand_pose.p.y, hand_pose.p.z])
             hand_rot_list.append([hand_pose.r.x, hand_pose.r.y, hand_pose.r.z, hand_pose.r.w])
 
 
             # get global index of hand in rigid body state tensor
-            hand_idx = gym.find_actor_rigid_body_index(env, kinova_handle, "base", gymapi.DOMAIN_SIM)
-            hand_idxs.append(hand_idx)
+            hand_idx = self.gym.find_actor_rigid_body_index(env, kinova_handle, "base", gymapi.DOMAIN_SIM)
+            self.hand_idxs.append(hand_idx)
 
             # get initial hammer pose
-            hammer_handle = gym.find_actor_rigid_body_handle(env, kinova_handle, "hammer")
-            hammer_pose = gym.get_rigid_transform(env, hammer_handle)
+            hammer_handle = self.gym.find_actor_rigid_body_handle(env, kinova_handle, "hammer")
+            hammer_pose = self.gym.get_rigid_transform(env, hammer_handle)
             hammer_pos_list.append([hammer_pose.p.x, hammer_pose.p.y, hammer_pose.p.z])
             hammer_rot_list.append([hammer_pose.r.x, hammer_pose.r.y, hammer_pose.r.z, hammer_pose.r.w])
 
             # get golbal index of hammer in rigid body state tensor
-            hammer_idx = gym.find_actor_rigid_body_index(env, kinova_handle, "hammer", gymapi.DOMAIN_SIM)
-            hammer_idxs.append(hammer_idx)
+            hammer_idx = self.gym.find_actor_rigid_body_index(env, kinova_handle, "hammer", gymapi.DOMAIN_SIM)
+            self.hammer_idxs.append(hammer_idx)
             
-
-
-
-        self.feet_indices = torch.zeros(len(feet_names), dtype=torch.long, device=self.device, requires_grad=False)
-        for i in range(len(feet_names)):
-            self.feet_indices[i] = self.gym.find_actor_rigid_body_handle(self.envs[0], self.actor_handles[0], feet_names[i])
-
-        self.penalised_contact_indices = torch.zeros(len(penalized_contact_names), dtype=torch.long, device=self.device, requires_grad=False)
-        for i in range(len(penalized_contact_names)):
-            self.penalised_contact_indices[i] = self.gym.find_actor_rigid_body_handle(self.envs[0], self.actor_handles[0], penalized_contact_names[i])
-
-        self.termination_contact_indices = torch.zeros(len(termination_contact_names), dtype=torch.long, device=self.device, requires_grad=False)
-        for i in range(len(termination_contact_names)):
-            self.termination_contact_indices[i] = self.gym.find_actor_rigid_body_handle(self.envs[0], self.actor_handles[0], termination_contact_names[i])
 
     def _get_env_origins(self):
         """ Sets environment origins. On rough terrain the origins are defined by the terrain platforms.
             Otherwise create a grid.
         """
-        if self.cfg.table.mesh_type in ["heightfield", "trimesh"]:
+        if self.cfg.ground.mesh_type in ["heightfield", "trimesh"]:
             self.custom_origins = True
             self.env_origins = torch.zeros(self.num_envs, 3, device=self.device, requires_grad=False)
             # put arm at the origins defined by the terrain
-            max_init_level = self.cfg.table.max_init_level
+            max_init_level = self.cfg.ground.max_init_level
             
             self.terrain_levels = torch.randint(0, max_init_level+1, (self.num_envs,), device=self.device)
-            self.terrain_types = torch.div(torch.arange(self.num_envs, device=self.device), (self.num_envs/self.cfg.table.num_cols), rounding_mode='floor').to(torch.long)
-            self.max_terrain_level = self.cfg.terrain.num_rows
+            self.terrain_types = torch.div(torch.arange(self.num_envs, device=self.device), (self.num_envs/self.cfg.ground.num_cols), rounding_mode='floor').to(torch.long)
+            self.max_terrain_level = self.cfg.ground.num_rows
             self.terrain_origins = torch.from_numpy(self.terrain.env_origins).to(self.device).to(torch.float)
             self.env_origins[:] = self.terrain_origins[self.terrain_levels, self.terrain_types]
         else:
@@ -1016,8 +992,8 @@ class Arm(BaseTask):
         self.obs_scales = self.cfg.normalization.obs_scales
         self.reward_scales = class_to_dict(self.cfg.rewards.scales)
         self.command_ranges = class_to_dict(self.cfg.commands.ranges)
-        if self.cfg.terrain.mesh_type not in ['heightfield', 'trimesh']:
-            self.cfg.terrain.curriculum = False
+        if self.cfg.ground.mesh_type not in ['heightfield', 'trimesh']:
+            self.cfg.ground.curriculum = False
         self.max_episode_length_s = self.cfg.env.episode_length_s
         self.max_episode_length = np.ceil(self.max_episode_length_s / self.dt)
 
@@ -1049,8 +1025,8 @@ class Arm(BaseTask):
         Returns:
             [torch.Tensor]: Tensor of shape (num_envs, self.num_height_points, 3)
         """
-        y = torch.tensor(self.cfg.terrain.measured_points_y, device=self.device, requires_grad=False)
-        x = torch.tensor(self.cfg.terrain.measured_points_x, device=self.device, requires_grad=False)
+        y = torch.tensor(self.cfg.ground.measured_points_y, device=self.device, requires_grad=False)
+        x = torch.tensor(self.cfg.ground.measured_points_x, device=self.device, requires_grad=False)
         grid_x, grid_y = torch.meshgrid(x, y)
 
         self.num_height_points = grid_x.numel()
@@ -1072,9 +1048,9 @@ class Arm(BaseTask):
         Returns:
             [type]: [description]
         """
-        if self.cfg.terrain.mesh_type == 'plane':
+        if self.cfg.ground.mesh_type == 'plane':
             return torch.zeros(self.num_envs, self.num_height_points, device=self.device, requires_grad=False)
-        elif self.cfg.terrain.mesh_type == 'none':
+        elif self.cfg.ground.mesh_type == 'none':
             raise NameError("Can't measure height with terrain mesh type 'none'")
 
         if env_ids:
