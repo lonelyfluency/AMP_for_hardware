@@ -122,6 +122,7 @@ class Arm(BaseTask):
         self._parse_cfg(self.cfg)
         super().__init__(self.cfg, sim_params, physics_engine, sim_device, headless)
         self.origin = gymapi.Transform()
+        self.keypoint_pos_rot_dic = {}
 
         if not self.headless:
             self.set_camera(self.cfg.viewer.pos, self.cfg.viewer.lookat)
@@ -236,9 +237,6 @@ class Arm(BaseTask):
         """
         if len(env_ids) == 0:
             return
-        # update curriculum
-        if self.cfg.ground.curriculum:
-            self._update_terrain_curriculum(env_ids)
         # avoid updating command curriculum at each step since the maximum command is common to all envs
         if self.cfg.commands.curriculum and (self.common_step_counter % self.max_episode_length==0):
             self.update_command_curriculum(env_ids)
@@ -266,8 +264,6 @@ class Arm(BaseTask):
             self.extras["episode"]['rew_' + key] = torch.mean(self.episode_sums[key][env_ids]) / self.max_episode_length_s
             self.episode_sums[key][env_ids] = 0.
         # log additional curriculum info
-        if self.cfg.ground.curriculum:
-            self.extras["episode"]["terrain_level"] = torch.mean(self.terrain_levels.float())
         if self.cfg.commands.curriculum:
             self.extras["episode"]["max_command_x"] = self.command_ranges["lin_vel_x"][1]
         # send timeout info to the algorithm
@@ -304,10 +300,6 @@ class Arm(BaseTask):
                                     self.dof_vel * self.obs_scales.dof_vel,
                                     self.actions
                                     ),dim=-1)
-        # add perceptive inputs if not blind
-        if self.cfg.ground.measure_heights:
-            heights = torch.clip(self.hammer_states[:, 2].unsqueeze(1) - 0.5 - self.measured_heights, -1, 1.) * self.obs_scales.height_measurements
-            self.privileged_obs_buf = torch.cat((self.privileged_obs_buf, heights), dim=-1)
 
         # add noise if needed
         if self.add_noise:
@@ -338,17 +330,6 @@ class Arm(BaseTask):
         """
         self.up_axis_idx = 2 # 2 for z, 1 for y -> adapt gravity accordingly
         self.sim = self.gym.create_sim(self.sim_device_id, self.graphics_device_id, self.physics_engine, self.sim_params)
-        mesh_type = self.cfg.ground.mesh_type
-        if mesh_type in ['heightfield', 'trimesh']:
-            self.terrain = Terrain(self.cfg.ground, self.num_envs)
-        if mesh_type=='plane':
-            self._create_ground_plane()
-        elif mesh_type=='heightfield':
-            self._create_heightfield()
-        elif mesh_type=='trimesh':
-            self._create_trimesh()
-        elif mesh_type is not None:
-            raise ValueError("Terrain mesh type not recognised. Allowed types are [None, plane, heightfield, trimesh]")
         self._create_envs()
 
     def set_camera(self, position, lookat):
@@ -435,8 +416,8 @@ class Arm(BaseTask):
             heading = torch.atan2(forward[:, 1], forward[:, 0])
             self.commands[:, 2] = torch.clip(0.5*wrap_to_pi(self.commands[:, 3] - heading), -1., 1.)
 
-        if self.cfg.ground.measure_heights:
-            self.measured_heights = self._get_heights()
+        # if self.cfg.ground.measure_heights:
+        #     self.measured_heights = self._get_heights()
         # if self.cfg.domain_rand.push_robots and  (self.common_step_counter % self.cfg.domain_rand.push_interval == 0):
         #     self._push_robots()
 
@@ -572,28 +553,6 @@ class Arm(BaseTask):
                                                      gymtorch.unwrap_tensor(self.hammer_states),
                                                      gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
 
-
-    def _update_terrain_curriculum(self, env_ids):
-        """ Implements the game-inspired curriculum.
-
-        Args:
-            env_ids (List[int]): ids of environments being reset
-        """
-        # Implement Terrain curriculum
-        if not self.init_done:
-            # don't change on initial reset
-            return
-        distance = torch.norm(self.hammer_states[env_ids, :2] - self.env_origins[env_ids, :2], dim=1)
-        # robots that walked far enough progress to harder terains
-        move_up = distance > self.terrain.env_length / 2
-        # robots that walked less than half of their required distance go to simpler terrains
-        move_down = (distance < torch.norm(self.commands[env_ids, :2], dim=1)*self.max_episode_length_s*0.5) * ~move_up
-        self.terrain_levels[env_ids] += 1 * move_up - 1 * move_down
-        # Robots that solve the last level are sent to a random one
-        self.terrain_levels[env_ids] = torch.where(self.terrain_levels[env_ids]>=self.max_terrain_level,
-                                                   torch.randint_like(self.terrain_levels[env_ids], self.max_terrain_level),
-                                                   torch.clip(self.terrain_levels[env_ids], 0)) # (the minumum level is zero)
-        self.env_origins[env_ids] = self.terrain_origins[self.terrain_levels[env_ids], self.terrain_types[env_ids]]
     
     def update_command_curriculum(self, env_ids):
         """ Implements a curriculum of increasing commands
@@ -672,8 +631,6 @@ class Arm(BaseTask):
         self.hand_lin_vel = quat_rotate_inverse(self.base_quat, self.hammer_states[:, 7:10])
         self.hand_ang_vel = quat_rotate_inverse(self.base_quat, self.hammer_states[:, 10:13])
         self.projected_gravity = quat_rotate_inverse(self.base_quat, self.gravity_vec)
-        if self.cfg.ground.measure_heights:
-            self.height_points = self._init_height_points()
         self.measured_heights = 0
 
         # joint positions offsets and PD gains
@@ -698,7 +655,7 @@ class Arm(BaseTask):
     def _get_keypoint_pos_rot(self):
         _rb_states = self.gym.acquire_rigid_body_state_tensor(self.sim)
         rb_states = gymtorch.wrap_tensor(_rb_states)
-        self.nail_pos = self.arm_states[self.self.nail_idxs, :3]
+        self.nail_pos = self.arm_states[self.nail_idxs, :3]
         nail_rot = rb_states[self.nail_idxs, 3:7]
 
         base_pos = rb_states[self.base_idxs, :3]
@@ -715,6 +672,30 @@ class Arm(BaseTask):
         hammer_tail = hand_pos.view(self.num_envs,3,1) + quat_2_rotMat(hand_rot).view(self.num_envs,3,3).to(torch.float32).to(self.device) @ HAND_2_HAMMERTAIL.view(3,1).to(torch.float32).to(self.device)
         hammer_claw = hand_pos.view(self.num_envs,3,1) + quat_2_rotMat(hand_rot).view(self.num_envs,3,3).to(torch.float32).to(self.device) @ HAND_2_HAMMERCLAW.view(3,1).to(torch.float32).to(self.device)
         hammer_grasp = hand_pos.view(self.num_envs,3,1) + quat_2_rotMat(hand_rot).view(self.num_envs,3,3).to(torch.float32).to(self.device) @ HAND_2_HAMMERGRASP.view(3,1).to(torch.float32).to(self.device)
+
+        hammer_mid_pos = hammer_mid.view(self.num_envs,3)
+        hammer_head_pos = hammer_head.view(self.num_envs,3)
+        hammer_tail_pos = hammer_tail.view(self.num_envs,3)
+        hammer_claw_pos = hammer_claw.view(self.num_envs,3)
+        hammer_grasp_pos = hammer_grasp.view(self.num_envs,3)
+
+        nail_head = self.nail_pos.view(self.num_envs,3,1) + quat_2_rotMat(nail_rot).view(self.num_envs,3,3).to(torch.float32).to(self.device) @ NAIL_2_NAILHEAD.view(3,1).to(torch.float32).to(self.device) 
+        nail_head_pos = nail_head.view(self.num_envs,3)
+
+        self.keypoint_pos_rot_dic["nail_pos"] = self.nail_pos
+        self.keypoint_pos_rot_dic["nail_rot"] = nail_rot
+        self.keypoint_pos_rot_dic["base_pos"] = base_pos
+        self.keypoint_pos_rot_dic["base_rot"] = base_rot
+        self.keypoint_pos_rot_dic["hand_pos"] = hand_pos
+        self.keypoint_pos_rot_dic["hand_rot"] = hand_rot
+        self.keypoint_pos_rot_dic["hammer_pos"] = hammer_pos
+        self.keypoint_pos_rot_dic["hammer_rot"] = hammer_rot
+        self.keypoint_pos_rot_dic["hammer_mid_pos"] = hammer_mid_pos
+        self.keypoint_pos_rot_dic["hammer_head_pos"] = hammer_head_pos
+        self.keypoint_pos_rot_dic["hammer_tail_pos"] = hammer_tail_pos
+        self.keypoint_pos_rot_dic["hammer_claw_pos"] = hammer_claw_pos
+        self.keypoint_pos_rot_dic["hammer_grasp_pos"] = hammer_grasp_pos
+        self.keypoint_pos_rot_dic["nail_head_pos"] = nail_head_pos
 
 
     def _is_rotation_matrix(self,R):
@@ -768,15 +749,6 @@ class Arm(BaseTask):
         self.episode_sums = {name: torch.zeros(self.num_envs, dtype=torch.float, device=self.device, requires_grad=False)
                              for name in self.reward_scales.keys()}
 
-    def _create_ground_plane(self):
-        """ Adds a ground plane to the simulation, sets friction and restitution based on the cfg.
-        """
-        plane_params = gymapi.PlaneParams()
-        plane_params.normal = gymapi.Vec3(0.0, 0.0, 1.0)
-        plane_params.static_friction = self.cfg.ground.static_friction
-        plane_params.dynamic_friction = self.cfg.ground.dynamic_friction
-        plane_params.restitution = self.cfg.ground.restitution
-        self.gym.add_ground(self.sim, plane_params)
 
     def _create_envs(self):
         """ Creates environments:
@@ -983,8 +955,6 @@ class Arm(BaseTask):
         self.obs_scales = self.cfg.normalization.obs_scales
         self.reward_scales = class_to_dict(self.cfg.rewards.scales)
         self.command_ranges = class_to_dict(self.cfg.commands.ranges)
-        if self.cfg.ground.mesh_type not in ['heightfield', 'trimesh']:
-            self.cfg.ground.curriculum = False
         self.max_episode_length_s = self.cfg.env.episode_length_s
         self.max_episode_length = np.ceil(self.max_episode_length_s / self.dt)
 
@@ -994,8 +964,6 @@ class Arm(BaseTask):
             Default behaviour: draws height measurement points
         """
         # draw height lines
-        if not self.terrain.cfg.measure_heights:
-            return
         self.gym.clear_lines(self.viewer)
         self.gym.refresh_rigid_body_state_tensor(self.sim)
         sphere_geom = gymutil.WireframeSphereGeometry(0.02, 4, 4, None, color=(1, 1, 0))
@@ -1008,61 +976,8 @@ class Arm(BaseTask):
                 y = height_points[j, 1] + base_pos[1]
                 z = heights[j]
                 sphere_pose = gymapi.Transform(gymapi.Vec3(x, y, z), r=None)
-                gymutil.draw_lines(sphere_geom, self.gym, self.viewer, self.envs[i], sphere_pose) 
+                gymutil.draw_lines(sphere_geom, self.gym, self.viewer, self.envs[i], sphere_pose)
 
-    def _init_height_points(self):
-        """ Returns points at which the height measurments are sampled (in base frame)
-
-        Returns:
-            [torch.Tensor]: Tensor of shape (num_envs, self.num_height_points, 3)
-        """
-        y = torch.tensor(self.cfg.ground.measured_points_y, device=self.device, requires_grad=False)
-        x = torch.tensor(self.cfg.ground.measured_points_x, device=self.device, requires_grad=False)
-        grid_x, grid_y = torch.meshgrid(x, y)
-
-        self.num_height_points = grid_x.numel()
-        points = torch.zeros(self.num_envs, self.num_height_points, 3, device=self.device, requires_grad=False)
-        points[:, :, 0] = grid_x.flatten()
-        points[:, :, 1] = grid_y.flatten()
-        return points
-
-    def _get_heights(self, env_ids=None):
-        """ Samples heights of the terrain at required points around each robot.
-            The points are offset by the base's position and rotated by the base's yaw
-
-        Args:
-            env_ids (List[int], optional): Subset of environments for which to return the heights. Defaults to None.
-
-        Raises:
-            NameError: [description]
-
-        Returns:
-            [type]: [description]
-        """
-        if self.cfg.ground.mesh_type == 'plane':
-            return torch.zeros(self.num_envs, self.num_height_points, device=self.device, requires_grad=False)
-        elif self.cfg.ground.mesh_type == 'none':
-            raise NameError("Can't measure height with terrain mesh type 'none'")
-
-        if env_ids:
-            points = quat_apply_yaw(self.base_quat[env_ids].repeat(1, self.num_height_points), self.height_points[env_ids]) + (self.hammer_states[env_ids, :3]).unsqueeze(1)
-        else:
-            points = quat_apply_yaw(self.base_quat.repeat(1, self.num_height_points), self.height_points) + (self.hammer_states[:, :3]).unsqueeze(1)
-
-        points += self.terrain.cfg.border_size
-        points = (points/self.terrain.cfg.horizontal_scale).long()
-        px = points[:, :, 0].view(-1)
-        py = points[:, :, 1].view(-1)
-        px = torch.clip(px, 0, self.height_samples.shape[0]-2)
-        py = torch.clip(py, 0, self.height_samples.shape[1]-2)
-
-        heights1 = self.height_samples[px, py]
-        heights2 = self.height_samples[px+1, py]
-        heights3 = self.height_samples[px, py+1]
-        heights = torch.min(heights1, heights2)
-        heights = torch.min(heights, heights3)
-
-        return heights.view(self.num_envs, -1) * self.terrain.cfg.vertical_scale
 
     #------------ reward functions----------------
     # def _reward_lin_vel_z(self):
