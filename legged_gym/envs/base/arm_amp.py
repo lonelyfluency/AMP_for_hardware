@@ -119,10 +119,13 @@ class Arm(BaseTask):
         self.height_samples = None
         self.debug_viz = False
         self.init_done = False
-        self._parse_cfg(self.cfg)
-        super().__init__(self.cfg, sim_params, physics_engine, sim_device, headless)
+
         self.origin = gymapi.Transform()
         self.keypoint_pos_rot_dic = {}
+
+        self._parse_cfg(self.cfg)
+        super().__init__(self.cfg, sim_params, physics_engine, sim_device, headless)
+        
 
         if not self.headless:
             self.set_camera(self.cfg.viewer.pos, self.cfg.viewer.lookat)
@@ -623,13 +626,10 @@ class Arm(BaseTask):
         self.actions = torch.zeros(self.num_envs, self.num_actions, dtype=torch.float, device=self.device, requires_grad=False)
         self.last_actions = torch.zeros(self.num_envs, self.num_actions, dtype=torch.float, device=self.device, requires_grad=False)
         self.last_dof_vel = torch.zeros_like(self.dof_vel)
-        self.last_hand_vel = torch.zeros_like(self.hammer_states[:, 7:13])
+        
         self.commands = torch.zeros(self.num_envs, self.cfg.commands.num_commands, dtype=torch.float, device=self.device, requires_grad=False) # default: lin_vel_tip_x, lin_vel_tip_y, lin_vel_tip_z, ang_vel_tip_a, ang_vel_tip_b, ang_vel_tip_c
         self.commands_scale = torch.tensor([self.obs_scales.lin_vel, self.obs_scales.lin_vel, self.obs_scales.lin_vel, self.obs_scales.ang_vel, self.obs_scales.ang_vel, self.obs_scales.ang_vel, self.obs_scales.ang_vel], device=self.device, requires_grad=False,) # 6 dim scale vector
         
-        self.last_contacts = torch.zeros(self.num_envs, len(self.feet_indices), dtype=torch.bool, device=self.device, requires_grad=False)
-        self.hand_lin_vel = quat_rotate_inverse(self.base_quat, self.hammer_states[:, 7:10])
-        self.hand_ang_vel = quat_rotate_inverse(self.base_quat, self.hammer_states[:, 10:13])
         self.projected_gravity = quat_rotate_inverse(self.base_quat, self.gravity_vec)
         self.measured_heights = 0
 
@@ -842,7 +842,7 @@ class Arm(BaseTask):
         kinova_pose = gymapi.Transform()
         kinova_pose.p = gymapi.Vec3(table_pose.p.x-0.5*table_dims.x+0.05, 0, table_dims.z)
 
-        self.origin.p = kinova_pose.p[:]
+        self.origin.p = kinova_pose.p
 
         nail_pose = gymapi.Transform()
 
@@ -871,7 +871,7 @@ class Arm(BaseTask):
         for i in range(self.num_envs):
             # create env
             env = self.gym.create_env(self.sim, env_lower, env_upper, int(np.sqrt(self.num_envs)))
-            envs.append(env)
+            self.envs.append(env)
 
             # add table
             table_handle = self.gym.create_actor(env, table_asset, table_pose, "table", i, 0)
@@ -946,9 +946,9 @@ class Arm(BaseTask):
         num_rows = np.ceil(self.num_envs / num_cols)
         xx, yy = torch.meshgrid(torch.arange(num_rows), torch.arange(num_cols))
         spacing = self.cfg.env.env_spacing
-        self.env_origins[:, 0] = spacing * xx.flatten()[:self.num_envs] + self.origin.p[0]
-        self.env_origins[:, 1] = spacing * yy.flatten()[:self.num_envs] + self.origin.p[1]
-        self.env_origins[:, 2] = self.origin.p[2]
+        self.env_origins[:, 0] = spacing * xx.flatten()[:self.num_envs] + self.origin.p.x
+        self.env_origins[:, 1] = spacing * yy.flatten()[:self.num_envs] + self.origin.p.y
+        self.env_origins[:, 2] = self.origin.p.z
 
     def _parse_cfg(self, cfg):
         self.dt = self.cfg.control.decimation * self.sim_params.dt

@@ -29,7 +29,8 @@
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
 import glob
 import numpy as np
-from legged_gym.envs.base.arm_config import ArmCfg, ArmCfgPPO
+# from legged_gym.envs.base.arm_config import ArmCfg, ArmCfgPPO
+from legged_gym.envs.base.arm_amp_config import ArmCfg, ArmCfgPPO
 
 MOTION_FILES = glob.glob('datasets/hammer_motions/*')
 
@@ -75,10 +76,6 @@ class gen3AMPCfg( ArmCfg ):
         # decimation: Number of control action updates @ sim DT per policy DT
         decimation = 6
 
-    class terrain( ArmCfg.terrain ):
-        mesh_type = 'plane'
-        measure_heights = False
-
     class asset( ArmCfg.asset ):
         file = '{LEGGED_GYM_ROOT_DIR}/resources/arms/kinovagen3/mjcf/kinova_hammer_isaacsim.xml'
         nail_file = '{LEGGED_GYM_ROOT_DIR}/resources/arms/kinovagen3/mjcf/nail.xml'
@@ -105,34 +102,24 @@ class gen3AMPCfg( ArmCfg ):
             height_measurements = 0.1
 
     class rewards( ArmCfg.rewards ):
-        soft_dof_pos_limit = 0.9
         class scales( ArmCfg.rewards.scales ):
-            termination = 0.0
-            # tracking_lin_vel = 1.5 * 1. / (.005 * 6)
-            # tracking_ang_vel = 0.5 * 1. / (.005 * 6)
-            lin_vel_z = 0.0
-            ang_vel_xy = 0.0
-            orientation = 0.0
-            torques = 0.0
-            dof_vel = 0.0
-            dof_acc = 0.0
-            collision = 0.0
-            action_rate = 0.0
+            termination = -0.0
+            reach = 2.0
+            knock_force = 1.0
+            torques = -0.00001
+            collision = -1.
+            action_rate = -0.01
 
     class commands:
         curriculum = False
         max_curriculum = 1.
-        num_commands = 6 # default: tip_x, tip_y, tip_z, tip_a, tip_b, tip_c
+        num_commands = 4 # default: x y z for hammer head, alpha for hammer head and hand pitch angle.
         resampling_time = 10. # time before command are changed[s]
-        heading_command = False # if true: compute ang vel command from heading error
         class ranges:
-            lin_vel_x = [-0.3, 0.3] # min max [m/s]
-            lin_vel_y = [-0.3, 0.3]   # min max [m/s]
-            lin_vel_z = [-0.3, 0.3]   # min max [m/s]
-            ang_vel_a = [-1.57, 1.57]    # min max [rad/s]
-            ang_vel_b = [-1.57, 1.57]    # min max [rad/s]
-            ang_vel_c = [-1.57, 1.57]    # min max [rad/s]
-            heading = [-3.14, 3.14]
+            x_range = [-0.1, 0.7] # min max [m]
+            y_range = [-0.3, 0.3]   # min max [m]
+            z_range = [0, 0.6]   # min max [m]
+            a_range = [-1.57, 1.57]
 
 class gen3AMPCfgPPO( ArmCfgPPO ):
     runner_class_name = 'AMPOnPolicyRunner'

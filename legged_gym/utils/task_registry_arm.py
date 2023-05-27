@@ -40,7 +40,8 @@ from rsl_rl.runners import OnPolicyRunner, AMPOnPolicyRunner
 from legged_gym import LEGGED_GYM_ROOT_DIR, LEGGED_GYM_ENVS_DIR
 from .helpers import get_args_arm, update_cfg_from_args, class_to_dict, get_load_path, set_seed, parse_sim_params
 from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO
-from legged_gym.envs.base.arm_config import ArmCfg, ArmCfgPPO
+# from legged_gym.envs.base.arm_config import ArmCfg, ArmCfgPPO
+from legged_gym.envs.base.arm_amp_config import ArmCfg, ArmCfgPPO
 
 class TaskRegistry():
     def __init__(self):

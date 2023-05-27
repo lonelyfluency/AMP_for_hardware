@@ -29,7 +29,8 @@
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
 
 import numpy as np
-from legged_gym.envs.base.arm_config import ArmCfg, ArmCfgPPO
+# from legged_gym.envs.base.arm_config import ArmCfg, ArmCfgPPO
+from legged_gym.envs.base.arm_amp_config import ArmCfg, ArmCfgPPO
 
 class gen3RoughCfg( ArmCfg ):
 
