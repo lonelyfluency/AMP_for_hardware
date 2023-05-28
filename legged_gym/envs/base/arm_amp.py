@@ -609,10 +609,14 @@ class Arm(BaseTask):
         # create some wrapper tensors for different slices
         self.gen3_base_states = gymtorch.wrap_tensor(actor_root_state)
         self.arm_states = gymtorch.wrap_tensor(arm_state)
+
+        # print("gen3_base_states: ",self.gen3_base_states)
+        # print("gen3_base_states shape: ",self.gen3_base_states.shape)
+
         self.dof_state = gymtorch.wrap_tensor(dof_state_tensor)
         self.dof_pos = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 0]
         self.dof_vel = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 1]
-        self.base_quat = self.gen3_base_states[:, 3:7]
+        self.base_quat = self.gen3_base_states[:10, 3:7]
         self.jacobian = gymtorch.wrap_tensor(_jacobian)
 
         self.contact_forces = gymtorch.wrap_tensor(net_contact_forces).view(self.num_envs, -1, 3) # shape: num_envs, num_bodies, xyz axis
