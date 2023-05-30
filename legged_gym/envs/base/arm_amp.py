@@ -227,8 +227,12 @@ class Arm(BaseTask):
     def check_termination(self):
         """ Check if environments need to be reset
         """
-        self.reset_buf = torch.any(torch.norm(self.contact_forces[:, self.hammer_head_index, :], dim=-1) > 1., dim=1)
+        # self.reset_buf = torch.any(torch.norm(self.contact_forces[:, self.hammer_head_index, :], dim=-1) > 1., 1)
+        self.reset_buf = torch.norm(self.contact_forces[:, self.hammer_head_index, :], dim=-1) > 1.
         self.time_out_buf = self.episode_length_buf > self.max_episode_length # no terminal reward for time-outs
+        
+        print("reset_buf:",self.reset_buf)
+        print("time_out_buf:",self.time_out_buf)
         self.reset_buf |= self.time_out_buf
 
     def reset_idx(self, env_ids):
@@ -931,9 +935,9 @@ class Arm(BaseTask):
         # Penalize changes in actions
         return torch.sum(torch.square(self.last_actions - self.actions), dim=1)
     
-    def _reward_collision(self):
-        # Penalize collisions on selected bodies
-        return torch.sum(1.*(torch.norm(self.contact_forces[:, self.penalised_contact_indices, :], dim=-1) > 0.1), dim=1)
+    # def _reward_collision(self):
+    #     # Penalize collisions on selected bodies
+    #     return torch.sum(1.*(torch.norm(self.contact_forces[:, self.penalised_contact_indices, :], dim=-1) > 0.1), dim=1)
     
     def _reward_termination(self):
         # Terminal reward / penalty
@@ -960,7 +964,7 @@ class Arm(BaseTask):
     
     def _reward_reach(self):
         # reward for reach the target
-        hammer_head_pos = torch.mean(self.hammer_states[:, 2].unsqueeze(1) - self.measured_heights, dim=1)
+        hammer_head_pos = torch.mean(self.keypoint_pos_rot_dic["hammer_head_pos"][:, 2].unsqueeze(1) - self.measured_heights, dim=1)
         return torch.square(hammer_head_pos - self.cfg.rewards.base_height_target)
     
     def _reward_knock_force(self):

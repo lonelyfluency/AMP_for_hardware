@@ -118,7 +118,7 @@ class ArmCfg(BaseConfig):
             reach = 2.0
             knock_force = 1.0
             # torques = -0.00001
-            collision = -1.
+            # collision = -1.
             action_rate = -0.01
 
         only_positive_rewards = True # if true negative total rewards are clipped at zero (avoids early termination problems)
