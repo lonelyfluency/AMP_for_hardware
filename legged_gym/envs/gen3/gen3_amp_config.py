@@ -106,7 +106,7 @@ class gen3AMPCfg( ArmCfg ):
             termination = -0.0
             reach = 2.0
             knock_force = 1.0
-            torques = -0.00001
+            # torques = -0.00001
             collision = -1.
             action_rate = -0.01
 

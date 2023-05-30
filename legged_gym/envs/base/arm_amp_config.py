@@ -117,7 +117,7 @@ class ArmCfg(BaseConfig):
             termination = -0.0
             reach = 2.0
             knock_force = 1.0
-            torques = -0.00001
+            # torques = -0.00001
             collision = -1.
             action_rate = -0.01
 
@@ -132,7 +132,7 @@ class ArmCfg(BaseConfig):
             ang_vel = 0.25
 
         clip_observations = 100.
-        clip_actions = 100.
+        clip_actions = 2.
 
     class noise:
         add_noise = True

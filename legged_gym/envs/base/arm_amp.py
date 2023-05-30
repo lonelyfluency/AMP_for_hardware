@@ -124,6 +124,7 @@ class Arm(BaseTask):
         self.keypoint_pos_rot_dic = {}
 
         self._parse_cfg(self.cfg)
+        
         super().__init__(self.cfg, sim_params, physics_engine, sim_device, headless)
         
 
@@ -131,6 +132,7 @@ class Arm(BaseTask):
             self.set_camera(self.cfg.viewer.pos, self.cfg.viewer.lookat)
         self._init_buffers()
         self._prepare_reward_function()
+        self._get_keypoint_pos_rot()
         self.init_done = True
 
         if self.cfg.env.reference_state_initialization:
@@ -157,8 +159,9 @@ class Arm(BaseTask):
         # step physics and render each frame
         self.render()
         for _ in range(self.cfg.control.decimation):
-            # self.torques = self._compute_torques(self.actions).view(self.torques.shape)
-            # self.gym.set_dof_actuation_force_tensor(self.sim, gymtorch.unwrap_tensor(self.torques))
+            print("action : ",actions)
+
+
             self.gym.simulate(self.sim)
             if self.device == 'cpu':
                 self.gym.fetch_results(self.sim, True)
@@ -198,7 +201,7 @@ class Arm(BaseTask):
         self.common_step_counter += 1
 
         # prepare quantities
-        self.base_quat[:] = self.hammer_states[:, 3:7]
+        self.base_quat[:] = self.keypoint_pos_rot_dic["base_rot"]
         # self.base_lin_vel[:] = quat_rotate_inverse(self.base_quat, self.hammer_states[:, 7:10])
         # self.base_ang_vel[:] = quat_rotate_inverse(self.base_quat, self.hammer_states[:, 10:13])
         self.projected_gravity[:] = quat_rotate_inverse(self.base_quat, self.gravity_vec)
@@ -215,7 +218,6 @@ class Arm(BaseTask):
 
         self.last_actions[:] = self.actions[:]
         self.last_dof_vel[:] = self.dof_vel[:]
-        self.last_root_vel[:] = self.hammer_states[:, 7:13]
 
         if self.viewer and self.enable_viewer_sync and self.debug_viz:
             self._draw_debug_vis()
@@ -225,7 +227,7 @@ class Arm(BaseTask):
     def check_termination(self):
         """ Check if environments need to be reset
         """
-        self.reset_buf = torch.any(torch.norm(self.contact_forces[:, self.termination_contact_indices, :], dim=-1) > 1., dim=1)
+        self.reset_buf = torch.any(torch.norm(self.contact_forces[:, self.hammer_head_index, :], dim=-1) > 1., dim=1)
         self.time_out_buf = self.episode_length_buf > self.max_episode_length # no terminal reward for time-outs
         self.reset_buf |= self.time_out_buf
 
@@ -253,7 +255,6 @@ class Arm(BaseTask):
             self._reset_dofs(env_ids)
             self._reset_hammer_states(env_ids)
 
-        self._resample_commands(env_ids)
 
         # reset buffers
         self.last_actions[env_ids] = 0.
@@ -295,8 +296,7 @@ class Arm(BaseTask):
     def compute_observations(self):
         """ Computes observations
         """
-        self.privileged_obs_buf = torch.cat(( self.base_lin_vel * self.obs_scales.lin_vel,
-                                    self.base_ang_vel  * self.obs_scales.ang_vel,
+        self.privileged_obs_buf = torch.cat((
                                     self.projected_gravity,
                                     self.commands[:, :3] * self.commands_scale,
                                     (self.dof_pos - self.default_dof_pos) * self.obs_scales.dof_pos,
@@ -316,17 +316,17 @@ class Arm(BaseTask):
 
     def get_amp_observations(self):
         joint_pos = self.dof_pos
-        hand_pos = torch.tensor(self.hand_positions_in_base_frame(self.dof_pos)).to(self.device)
+        hand_pos = self.keypoint_pos_rot_dic["hand_pos"]
         # base_lin_vel = self.base_lin_vel
         # base_ang_vel = self.base_ang_vel
         joint_vel = self.dof_vel
-        z_pos = self.hammer_states[:, 2:3]
+        
         print("joint_pos.shape ", joint_pos.shape)
         print("hand_pos.shape ", hand_pos.shape)
         print("joint_vel.shape ", joint_vel.shape)
-        print("z_pos.shape ", z_pos.shape)
+
         # return torch.cat((joint_pos, hand_pos, base_lin_vel, base_ang_vel, joint_vel, z_pos), dim=-1)
-        return torch.cat((joint_pos, hand_pos, joint_vel, z_pos), dim=-1)
+        return torch.cat((joint_pos, hand_pos, joint_vel), dim=-1)
 
     def create_sim(self):
         """ Creates simulation, terrain and evironments
@@ -402,11 +402,11 @@ class Arm(BaseTask):
         """
         # 
         env_ids = (self.episode_length_buf % int(self.cfg.commands.resampling_time / self.dt)==0).nonzero(as_tuple=False).flatten()
-        self._resample_commands(env_ids)
-        if self.cfg.commands.heading_command:
-            forward = quat_apply(self.base_quat, self.forward_vec)
-            heading = torch.atan2(forward[:, 1], forward[:, 0])
-            self.commands[:, 2] = torch.clip(0.5*wrap_to_pi(self.commands[:, 3] - heading), -1., 1.)
+        
+        # if self.cfg.commands.heading_command:
+        #     forward = quat_apply(self.base_quat, self.forward_vec)
+        #     heading = torch.atan2(forward[:, 1], forward[:, 0])
+        #     self.commands[:, 2] = torch.clip(0.5*wrap_to_pi(self.commands[:, 3] - heading), -1., 1.)
 
 
     def _reset_dofs(self, env_ids):
