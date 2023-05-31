@@ -150,7 +150,7 @@ class ArmCfg(BaseConfig):
     class viewer:
         ref_env = 0
         pos = [10, 0, 6]  # [m]
-        lookat = [11., 5, 3.]  # [m]
+        lookat = [1., 1, 1.]  # [m]
 
     class sim:
         dt =  0.005
