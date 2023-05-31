@@ -128,8 +128,12 @@ class ArmCfg(BaseConfig):
 
     class normalization:
         class obs_scales:
-            lin_vel = 1.0
-            ang_vel = 0.25
+            x_scale = 1
+            y_scale = 1
+            z_scale = 1
+            beta_scale = 1
+            dof_pos = 1
+            dof_vel = 1
 
         clip_observations = 100.
         clip_actions = 2.
