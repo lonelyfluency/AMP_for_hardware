@@ -225,6 +225,8 @@ hand_pos_list = []
 hand_rot_list = []
 hammer_pos_list = []
 hammer_rot_list = []
+hammer_sensor_list = []
+nail_sensor_list = []
 
 # add ground plane
 plane_params = gymapi.PlaneParams()
@@ -295,6 +297,15 @@ for i in range(num_envs):
     # get golbal index of hammer in rigid body state tensor
     hammer_idx = gym.find_actor_rigid_body_index(env, kinova_handle, "hammer", gymapi.DOMAIN_SIM)
     hammer_idxs.append(hammer_idx)
+
+    sensor_pose = gymapi.Transform(gymapi.Vec3(0.2, 0.0, 0.0))
+    sensor_props = gymapi.ForceSensorProperties()
+    sensor_props.enable_forward_dynamics_forces = True
+    sensor_props.enable_constraint_solver_forces = True
+    sensor_props.use_world_frame = False
+
+    sensor_idx = gym.create_asset_force_sensor(kinova_asset, kinova_hammer_head_index, sensor_pose, sensor_props)
+    hammer_sensor_list.append(sensor_idx)
 
 
 # point camera at middle env

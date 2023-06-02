@@ -245,7 +245,7 @@ class Arm(BaseTask):
         Args:
             env_ids (list[int]): List of environment ids which must be reset
         """
-        print("env_ids: ",env_ids)
+        print("env_ids 1: ",env_ids)
         if len(env_ids) == 0:
             return
         # avoid updating command curriculum at each step since the maximum command is common to all envs
@@ -261,11 +261,11 @@ class Arm(BaseTask):
             self._reset_dofs(env_ids)
             self._reset_hammer_states(env_ids)
 
-        for i in env_ids:
-            print(self.last_actions[i])
         # reset buffers
-        self.last_actions[env_ids] = torch.zeros(4,device=self.device)
-        self.last_dof_vel[env_ids] = torch.zeros(15,device=self.device)
+        print("env_ids 2: ", env_ids)
+        print(self.last_actions)
+        self.last_actions[env_ids] = 0
+        self.last_dof_vel[env_ids] = 0
         
         self.episode_length_buf[env_ids] = 0
         self.reset_buf[env_ids] = 1
@@ -443,7 +443,7 @@ class Arm(BaseTask):
         """
         # self.dof_pos[env_ids] = AMPLoader.get_pos_batch(frames)
         # self.dof_vel[env_ids] = AMPLoader.get_vel_batch(frames)
-        print(torch.tensor(list(self.cfg.init_state.default_joint_angles.values()),device=self.device))
+        # print(torch.tensor(list(self.cfg.init_state.default_joint_angles.values()),device=self.device))
         self.dof_pos[env_ids] = torch.tensor(list(self.cfg.init_state.default_joint_angles.values()),device=self.device)
         self.dof_vel[env_ids] = torch.zeros_like(self.dof_vel[env_ids])
         env_ids_int32 = env_ids.to(dtype=torch.int32)
@@ -520,7 +520,9 @@ class Arm(BaseTask):
         self.dof_state = gymtorch.wrap_tensor(dof_state_tensor)
         self.dof_pos = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 0]
         self.dof_vel = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 1]
-        self.base_quat = self.gen3_base_states[:10, 3:7]
+        print(self.gen3_base_states.shape)
+        num_selected = torch.arange(self.num_envs)*3
+        self.base_quat = self.gen3_base_states[num_selected, 3:7]
         self.jacobian = gymtorch.wrap_tensor(_jacobian)
 
         self.contact_forces = gymtorch.wrap_tensor(net_contact_forces).view(self.num_envs, -1, 3) # shape: num_envs, num_bodies, xyz axis

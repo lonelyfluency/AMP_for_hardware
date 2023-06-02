@@ -28,37 +28,24 @@
 #
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
 
-import numpy as np
+from legged_gym import LEGGED_GYM_ROOT_DIR, LEGGED_GYM_ENVS_DIR
+from legged_gym.envs.a1.a1_config import A1RoughCfg, A1RoughCfgPPO
+from legged_gym.envs.gen3.gen3_config import gen3RoughCfg, gen3RoughCfgPPO
+from .base.legged_robot import LeggedRobot
+# from .base.arm import Arm
+from .base.arm_amp import Arm
+from .a1.a1_config import A1RoughCfg, A1RoughCfgPPO
+from .a1.a1_amp_config import A1AMPCfg, A1AMPCfgPPO
+from .gen3.gen3_config import gen3RoughCfg, gen3RoughCfgPPO
+from .gen3.gen3_amp_config import gen3AMPCfg, gen3AMPCfgPPO
+
 import os
-from datetime import datetime
 
-import isaacgym
-from legged_gym.envs import *
-from legged_gym.utils import  get_args_arm, export_policy_as_jit, task_registry_arm, Logger
+from legged_gym.utils.task_registry import task_registry
+from legged_gym.utils.task_registry_arm import task_registry_arm
 
-import torch
+task_registry.register( "a1", LeggedRobot, A1RoughCfg(), A1RoughCfgPPO() )
+task_registry.register( "a1_amp", LeggedRobot, A1AMPCfg(), A1AMPCfgPPO() )
 
-
-def test_env(args):
-    env_cfg, train_cfg = task_registry_arm.get_cfgs(name=args.task)
-    # override some parameters for testing
-    env_cfg.env.num_envs =  min(env_cfg.env.num_envs, 4)
-
-    # prepare environment
-    env, _ = task_registry_arm.make_env(name=args.task, args=args, env_cfg=env_cfg)
-    for i in range(int(10*env.max_episode_length)):
-        actions = 0.*torch.ones(env.num_envs, env.num_actions, device=env.device)
-        policy_obs, privileged_obs_buf, rew_buf, reset_buf, extras, reset_env_ids, terminal_amp_states = env.step(actions)
-        print("policy_obs",policy_obs)
-        print("privileged_obs_buf",privileged_obs_buf)
-        print("rew_buf",rew_buf)
-        print("reset_buf",reset_buf)
-        print("extras",extras)
-        print("reset_env_ids",reset_env_ids)
-        print("terminal_amp_states",terminal_amp_states)
-    print("Done")
-
-if __name__ == '__main__':
-    args = get_args_arm()
-    print("args: ",args)
-    test_env(args)
+task_registry_arm.register( "gen3", Arm, gen3RoughCfg(), gen3RoughCfgPPO() )
+task_registry_arm.register( "gen3_amp", Arm, gen3AMPCfg(), gen3AMPCfgPPO() )

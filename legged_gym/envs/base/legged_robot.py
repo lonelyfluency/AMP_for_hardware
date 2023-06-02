@@ -218,6 +218,9 @@ class LeggedRobot(BaseTask):
             self.randomized_d_gains[env_ids] = new_randomized_gains[1]
 
         # reset buffers
+        print("env_ids: ", env_ids)
+        print(self.last_actions.shape)
+        print(1/0)
         self.last_actions[env_ids] = 0.
         self.last_dof_vel[env_ids] = 0.
         self.feet_air_time[env_ids] = 0.
